@@ -2,6 +2,7 @@
   "name": "scopy",
   "version": "1.0.0",
   "description": "File distribution utility for deploying assets from registered sources to registered destinations",
+  "type": "module",
   "main": "./src/index.js",
   "bin": {
     "scopy": "./src/scopy.js"
