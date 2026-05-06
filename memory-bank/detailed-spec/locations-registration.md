@@ -1,0 +1,28 @@
+# Locations Registration
+
+Commands and config for registering asset locations — sources to copy from, and destinations to copy to. Each location is an entry in the config file at `~/.config/scopy/scopy.json`. Sources can be git repositories (HTTPS) or local directories.
+
+## Config File
+Location: `~/.config/scopy/scopy.json` (user home, `.config/scopy/` directory); created on first write
+```json
+{
+  "sources": [
+    { "name": "{name}", "location": "{uri|abs_path}", "path": "{path?}" }
+  ]
+}
+```
+- `sources` — array of registered source locations
+- `name` (str): unique identifier for the source
+- `location` (str): absolute URL (git) or absolute filesystem path (local)
+- `path` (str, optional): sub-path within a git repository; only present for git sources
+
+## Source Command
+`scopy source` manages the set of registered asset sources
+To add a source, run `scopy source add <name> <location>`. The location is parsed to determine its type. Git URLs must start with `https://` — SSH (`git@`) is rejected. An optional sub-path is extracted: `https://github.com/owner/repo/path/to/dir` resolves to base repo `https://github.com/owner/repo` with sub-path `/path/to/dir`
+Local paths are resolved to an absolute path and validated to exist as a directory (not a file)
+To remove a source, run `scopy source remove <name>`. Errors if the name is not found
+To list all registered sources, run `scopy source list`
+
+## Validation
+- Git URLs & Local paths must exist
+- Rejects duplicated names
