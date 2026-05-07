@@ -8,6 +8,9 @@ Location: `~/.config/scopy/scopy.json` (user home, `.config/scopy/` directory); 
 {
   "sources": [
     { "name": "{name}", "location": "{uri|abs_path}", "path": "{path?}" }
+  ],
+  "destinations": [
+    { "name": "{name}", "location": "{abs_path}" }
   ]
 }
 ```
@@ -15,6 +18,9 @@ Location: `~/.config/scopy/scopy.json` (user home, `.config/scopy/` directory); 
 - `name` (str): unique identifier for the source
 - `location` (str): absolute URL (git) or absolute filesystem path (local)
 - `path` (str, optional): sub-path within a git repository; only present for git sources
+- `destinations` — array of registered destination locations
+- `name` (str): unique identifier for the destination
+- `location` (str): absolute filesystem path (local)
 
 ## Source Command
 `scopy source` manages the set of registered asset sources
@@ -22,6 +28,12 @@ To add a source, run `scopy source add <name> <location>`. The location is parse
 Local paths are resolved to an absolute path and validated to exist as a directory (not a file)
 To remove a source, run `scopy source remove <name>`. Errors if the name is not found
 To list all registered sources, run `scopy source list`
+
+## Destination Command
+`scopy dest` manages the set of registered destination locations
+To add a destination, run `scopy dest add <name> <location>`. The location must be a local filesystem path. It is resolved to an absolute path and validated to exist as a directory (not a file)
+To remove a destination, run `scopy dest remove <name>`. Errors if the name is not found
+To list all registered destinations, run `scopy dest list`
 
 ## Validation
 - Git URLs & Local paths must exist

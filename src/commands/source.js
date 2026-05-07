@@ -1,8 +1,8 @@
 import { simpleGit } from 'simple-git';
-import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
 import { getSources, addSource, removeSource, sourceExists } from '../config.js';
+import { validateLocalPath } from '../validate.js';
 
 /**
  * @param {string} location
@@ -34,21 +34,6 @@ async function validateGitRepo(url) {
   } catch {
     return false;
   }
-}
-
-/**
- * @param {string} dir
- * @returns {{valid: boolean, error?: string}}
- */
-function validateLocalPath(dir) {
-  const resolved = path.resolve(dir);
-  if (!fs.existsSync(resolved)) {
-    return { valid: false, error: `Path does not exist: ${resolved}` };
-  }
-  if (!fs.statSync(resolved).isDirectory()) {
-    return { valid: false, error: `Not a directory: ${resolved}` };
-  }
-  return { valid: true };
 }
 
 async function handleAdd(name, location) {
