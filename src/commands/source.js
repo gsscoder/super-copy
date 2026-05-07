@@ -53,7 +53,7 @@ async function handleAdd(name, location) {
       console.log(chalk.red(`✖ Git repository not accessible: ${parsed.baseUrl}`));
       return;
     }
-    addSource({ name, location, path: parsed.subPath || undefined });
+    addSource({ name, location: parsed.baseUrl, path: parsed.subPath || undefined });
   } else {
     const result = validateLocalPath(location);
     if (!result.valid) {
