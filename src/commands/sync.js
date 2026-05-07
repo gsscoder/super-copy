@@ -10,6 +10,9 @@ import {
   getDestinations,
   destinationExists,
   addCopy,
+  getLastPull,
+  setLastPull,
+  getRepoPullTtlSec,
 } from '../config.js';
 
 /**
@@ -56,10 +59,23 @@ async function ensureGitRepo(name, url) {
   const gitDir = path.join(cacheDir, '.git');
 
   if (fs.existsSync(gitDir)) {
+    const ttl = getRepoPullTtlSec();
+    if (ttl > 0) {
+      const lastPull = getLastPull(name);
+      if (lastPull !== null) {
+        const elapsed = (Date.now() - new Date(lastPull).getTime()) / 1000;
+        if (elapsed < ttl) {
+          console.log(`  ${chalk.dim('Up-to-date (cached)')}`);
+          return;
+        }
+      }
+    }
+
     process.stdout.write(`  ${chalk.dim('Fetching')} ${name}... `);
     try {
       const git = simpleGit(cacheDir);
       await git.pull();
+      setLastPull(name, new Date().toISOString());
       console.log(chalk.green('done'));
     } catch (err) {
       console.log(chalk.red('failed'));
@@ -71,6 +87,7 @@ async function ensureGitRepo(name, url) {
       fs.mkdirSync(path.dirname(cacheDir), { recursive: true });
       const git = simpleGit();
       await git.clone(url, cacheDir, ['--depth', '1']);
+      setLastPull(name, new Date().toISOString());
       console.log(chalk.green('done'));
     } catch (err) {
       console.log(chalk.red('failed'));

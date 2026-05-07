@@ -6,7 +6,7 @@ import path from 'node:path';
 const config = new Conf({
   cwd: path.join(os.homedir(), '.config', 'scopy'),
   configName: 'scopy',
-  defaults: { sources: [], destinations: [] },
+  defaults: { sources: [], destinations: [], repo_pull_ttl_sec: 0, lastPullTimestamps: {} },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
@@ -18,6 +18,33 @@ const copiesConfig = new Conf({
   defaults: { copies: [] },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
+
+/**
+ * @returns {number}
+ */
+export function getRepoPullTtlSec() {
+  return config.get('repo_pull_ttl_sec');
+}
+
+/**
+ * @param {string} sourceName
+ * @returns {string|null}
+ */
+export function getLastPull(sourceName) {
+  const timestamps = config.get('lastPullTimestamps');
+  return timestamps[sourceName] || null;
+}
+
+/**
+ * @param {string} sourceName
+ * @param {string} timestamp
+ * @returns {void}
+ */
+export function setLastPull(sourceName, timestamp) {
+  const timestamps = config.get('lastPullTimestamps');
+  timestamps[sourceName] = timestamp;
+  config.set('lastPullTimestamps', timestamps);
+}
 
 /**
  * @returns {Array<{name: string, location: string, path?: string}>}
