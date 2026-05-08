@@ -84,6 +84,9 @@ async function ensureGitRepo(name, url) {
   } else {
     process.stdout.write(`  ${chalk.dim('Cloning')} ${name}... `);
     try {
+      if (!/^https?:\/\//.test(url)) {
+        throw new Error(`Refusing to clone "${url}": only http:// and https:// URLs are allowed`);
+      }
       fs.mkdirSync(path.dirname(cacheDir), { recursive: true });
       const git = simpleGit();
       await git.clone(url, cacheDir, ['--depth', '1']);
@@ -115,6 +118,11 @@ function resolveFiles(workTree, fileSpec) {
     const globPart = fileSpec.slice(lastSlash + 1);
     const regex = globPattern(globPart);
     const dirPath = path.join(workTree, dirPart);
+    const resolvedDir = path.resolve(dirPath);
+    const baseRes = path.resolve(workTree);
+    if (resolvedDir !== baseRes && !resolvedDir.startsWith(baseRes + path.sep)) {
+      throw new Error(`fileSpec escapes base directory: ${fileSpec}`);
+    }
 
     if (!fs.existsSync(dirPath)) {
       return [];
@@ -130,6 +138,10 @@ function resolveFiles(workTree, fileSpec) {
 
   // Specific file path
   const srcPath = path.join(workTree, fileSpec);
+  const resolvedSrc = path.resolve(srcPath);
+  if (!resolvedSrc.startsWith(path.resolve(workTree) + path.sep)) {
+    throw new Error(`fileSpec escapes base directory: ${fileSpec}`);
+  }
   if (!fs.existsSync(srcPath)) {
     return [];
   }
@@ -174,7 +186,8 @@ async function handleSync(sourceSpec, destName, options) {
   // Determine work tree
   let workTree;
 
-  if (source.location.startsWith('https://')) {
+  const isGitUrl = /^https?:\/\/|^ssh:\/\/|^git@/.test(source.location);
+  if (isGitUrl) {
     await ensureGitRepo(sourceName, source.location);
 
     const cacheDir = gitCacheDir(sourceName);
@@ -189,8 +202,8 @@ async function handleSync(sourceSpec, destName, options) {
   let files;
   try {
     files = resolveFiles(workTree, fileSpec);
-  } catch {
-    console.log(chalk.red(`✖ Error reading source files${fileSpec ? ` for "${fileSpec}"` : ''}`));
+  } catch (err) {
+    console.log(chalk.red(`✖ Error reading source files${fileSpec ? ` for "${fileSpec}"` : ''}: ${err.message}`));
     return;
   }
 
@@ -210,9 +223,10 @@ async function handleSync(sourceSpec, destName, options) {
   // Copy files
   let copied = 0;
   let skipped = 0;
+  const copyErrors = [];
 
   for (const f of files) {
-    const destPath = path.join(dest.location, path.basename(f.rel));
+    const destPath = path.join(dest.location, f.rel);
     const existed = fs.existsSync(destPath);
 
     if (existed && !force) {
@@ -223,22 +237,32 @@ async function handleSync(sourceSpec, destName, options) {
       }
     }
 
-    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-    fs.copyFileSync(f.src, destPath);
+    try {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(f.src, destPath);
 
-    console.log(`    ${chalk.green('✓')} ${f.rel}${existed ? chalk.dim(' (overwritten)') : ''}`);
+      addCopy({
+        source: sourceName,
+        destination: destName,
+        file: f.rel,
+        copiedAt: new Date().toISOString(),
+      });
 
-    addCopy({
-      source: sourceName,
-      destination: destName,
-      file: f.rel,
-      copiedAt: new Date().toISOString(),
-    });
-
-    copied++;
+      console.log(`    ${chalk.green('✓')} ${f.rel}${existed ? chalk.dim(' (overwritten)') : ''}`);
+      copied++;
+    } catch (err) {
+      copyErrors.push({ file: f.rel, err });
+      console.error(`    ${chalk.red('✗')} ${f.rel}: ${err.message}`);
+    }
   }
 
   console.log(`  ${copied} copied, ${skipped} skipped`);
+
+  if (copyErrors.length > 0) {
+    const noun = copyErrors.length === 1 ? 'error' : 'errors';
+    throw new Error(`${copyErrors.length} file ${noun} during sync:\n` +
+      copyErrors.map(e => `  ${e.file}: ${e.err.message}`).join('\n'));
+  }
 }
 
 /**

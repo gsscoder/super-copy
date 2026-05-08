@@ -3,6 +3,7 @@ import envPaths from 'env-paths';
 import os from 'node:os';
 import path from 'node:path';
 
+// WARNING: concurrent access is not supported — config.get/set sequences are not atomic and parallel processes will cause silent data loss.
 const config = new Conf({
   cwd: path.join(os.homedir(), '.config', 'scopy'),
   configName: 'scopy',
