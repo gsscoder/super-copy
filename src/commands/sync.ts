@@ -15,6 +15,7 @@ import {
   setLastPull,
   getRepoPullTtlSec,
 } from '../config.js';
+import { error as uiError, dim } from '../ui.js';
 
 function globPattern(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
@@ -47,13 +48,13 @@ async function ensureGitRepo(name: string, url: string): Promise<void> {
       if (lastPull !== null) {
         const elapsed = (Date.now() - new Date(lastPull).getTime()) / 1000;
         if (elapsed < ttl) {
-          console.log(`  ${chalk.dim('Up-to-date (cached)')}`);
+          dim('Up-to-date (cached)');
           return;
         }
       }
     }
 
-    process.stdout.write(`  ${chalk.dim('Fetching')} ${name}... `);
+    process.stdout.write(`${chalk.dim('Fetching')} ${name}... `);
     try {
       const git = simpleGit(cacheDir);
       await git.pull();
@@ -64,7 +65,7 @@ async function ensureGitRepo(name: string, url: string): Promise<void> {
       throw new Error(`Failed to pull git repo for "${name}": ${err instanceof Error ? err.message : String(err)}`);
     }
   } else {
-    process.stdout.write(`  ${chalk.dim('Cloning')} ${name}... `);
+    process.stdout.write(`${chalk.dim('Cloning')} ${name}... `);
     try {
       if (!/^https?:\/\//.test(url)) {
         throw new Error(`Refusing to clone "${url}": only http:// and https:// URLs are allowed`);
@@ -141,12 +142,12 @@ async function handleSync(sourceSpec: string, destName: string, options: { force
 
   // Validate
   if (!sourceExists(sourceName)) {
-    console.log(chalk.red(`✖ Source "${sourceName}" not found`));
+    uiError(`source "${sourceName}" not found`);
     return;
   }
 
   if (!destinationExists(destName)) {
-    console.log(chalk.red(`✖ Destination "${destName}" not found`));
+    uiError(`destination "${destName}" not found`);
     return;
   }
 
@@ -154,11 +155,9 @@ async function handleSync(sourceSpec: string, destName: string, options: { force
   const dest = getDestinations().find((d) => d.name === destName);
 
   if (source === undefined || dest === undefined) {
-    console.log(chalk.red('✖ Internal error: source or destination missing after validation'));
+    uiError('internal error: source or destination missing after validation');
     return;
   }
-
-  console.log(`  ${chalk.cyan(sourceName)} ${chalk.dim('→')} ${chalk.cyan(destName)}`);
 
   // Determine work tree
   let workTree: string;
@@ -179,19 +178,19 @@ async function handleSync(sourceSpec: string, destName: string, options: { force
   try {
     files = resolveFiles(workTree, fileSpec);
   } catch (err) {
-    console.log(chalk.red(`✖ Error reading source files${fileSpec ? ` for "${fileSpec}"` : ''}: ${err instanceof Error ? err.message : String(err)}`));
+    uiError(`error reading source files${fileSpec ? ` for "${fileSpec}"` : ''}: ${err instanceof Error ? err.message : String(err)}`);
     return;
   }
 
   if (files.length === 0) {
-    console.log(chalk.dim('  No files to copy'));
+    dim('No files to copy');
     return;
   }
 
   if (dryRun) {
-    console.log(`  ${chalk.dim('Would copy')} ${files.length} file${files.length === 1 ? '' : 's'}:`);
+    console.log(`${chalk.dim('Would copy')} ${files.length} file${files.length === 1 ? '' : 's'}:`);
     for (const f of files) {
-      console.log(`    ${chalk.dim('·')} ${f.rel}`);
+      console.log(`${chalk.dim('·')} ${f.rel}`);
     }
     return;
   }
@@ -206,7 +205,7 @@ async function handleSync(sourceSpec: string, destName: string, options: { force
     const existed = fs.existsSync(destPath);
 
     if (existed && !force) {
-      const ok = await confirm(`    ${chalk.dim('Overwrite')} ${f.rel}? `);
+      const ok = await confirm(`${chalk.dim('overwrite')} ${f.rel}? `);
       if (!ok) {
         skipped++;
         continue;
@@ -224,16 +223,16 @@ async function handleSync(sourceSpec: string, destName: string, options: { force
         copiedAt: new Date().toISOString(),
       });
 
-      console.log(`    ${chalk.green('✓')} ${f.rel}${existed ? chalk.dim(' (overwritten)') : ''}`);
+      console.log(`${chalk.green('✓')} ${f.rel}${existed ? chalk.dim(' (overwritten)') : ''}`);
       copied++;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       copyErrors.push({ file: f.rel, err: error });
-      console.error(`    ${chalk.red('✗')} ${f.rel}: ${error.message}`);
+      console.error(`❌ ${f.rel}: ${error.message}`);
     }
   }
 
-  console.log(`  ${copied} copied, ${skipped} skipped`);
+  console.log(`${chalk.green(String(copied))} copied, ${chalk.yellow(String(skipped))} skipped`);
 
   if (copyErrors.length > 0) {
     const noun = copyErrors.length === 1 ? 'error' : 'errors';

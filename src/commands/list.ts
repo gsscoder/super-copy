@@ -1,34 +1,29 @@
-import chalk from 'chalk';
 import type { Command } from 'commander';
 import { getSources, getDestinations } from '../config.js';
+import { heading, listItem, dim } from '../ui.js';
 
 function handleList(): void {
   const sources = getSources();
   const destinations = getDestinations();
 
-  // Sources section
-  console.log('');
-  console.log(`  ${chalk.bold('Sources')}`);
-  console.log(`  ${chalk.dim('─'.repeat(50))}`);
+  heading('sources');
   if (sources.length === 0) {
-    console.log(`  ${chalk.dim('No sources registered')}`);
+    dim('no sources registered');
   } else {
+    const w = Math.max(...sources.map((s) => s.name.length)) + 2;
     for (const s of sources) {
       const loc = s.type === 'git' && s.path ? `${s.location} [path: ${s.path}]` : s.location;
-      console.log(`  ${chalk.cyan(s.name.padEnd(20))} ${chalk.dim('→')}  ${loc}`);
+      listItem(s.name, loc, w);
     }
   }
 
-  console.log('');
-
-  // Destinations section
-  console.log(`  ${chalk.bold('Destinations')}`);
-  console.log(`  ${chalk.dim('─'.repeat(50))}`);
+  heading('destinations');
   if (destinations.length === 0) {
-    console.log(`  ${chalk.dim('No destinations registered')}`);
+    dim('no destinations registered');
   } else {
+    const w = Math.max(...destinations.map((d) => d.name.length)) + 2;
     for (const d of destinations) {
-      console.log(`  ${chalk.cyan(d.name.padEnd(20))} ${chalk.dim('→')}  ${d.location}`);
+      listItem(d.name, d.location, w);
     }
   }
 }

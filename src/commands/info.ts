@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import envPaths from 'env-paths';
 import type { Command } from 'commander';
 import { isPackageJson } from '../types.js';
+import { keyValue } from '../ui.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const _raw: unknown = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), { encoding: 'utf8' }));
@@ -18,12 +19,9 @@ function handleInfo(): void {
   const configPath = path.join(configDir, 'scopy.json');
   const repoPath = path.join(envPaths('scopy', { suffix: '' }).data, 'repos');
 
-  console.log('');
-  console.log(`  ${chalk.bold.cyan(pkg.name)}  ${chalk.dim(`v${pkg.version}`)}`);
-  console.log(`  ${chalk.dim('─'.repeat(50))}`);
-  console.log(`  ${chalk.cyan('Config File'.padEnd(20))}${chalk.dim(configPath)}`);
-  console.log(`  ${chalk.cyan('Repo Clone Path'.padEnd(20))}${chalk.dim(repoPath)}`);
-  console.log('');
+  console.log(`${chalk.bold.white(pkg.name)} ${chalk.dim(`v${pkg.version}`)}`)
+  keyValue('config', configPath);
+  keyValue('clone path', repoPath);
 }
 
 export default function register(program: Command): void {

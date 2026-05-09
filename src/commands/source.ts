@@ -1,9 +1,9 @@
 import { simpleGit } from 'simple-git';
 import path from 'node:path';
-import chalk from 'chalk';
 import type { Command } from 'commander';
 import { getSources, addSource, removeSource, sourceExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
+import { listItem, success, error, dim, blank } from '../ui.js';
 
 interface ParsedGitLocation {
   type: 'git'
@@ -43,53 +43,55 @@ async function validateGitRepo(url: string): Promise<boolean> {
 
 async function handleAdd(name: string, location: string): Promise<void> {
   if (sourceExists(name)) {
-    console.log(chalk.red(`✖ Source "${name}" already exists`));
+    error(`source "${name}" already exists`);
     return;
   }
 
   const parsed = parseLocation(location);
   if (!parsed) {
-    console.log(chalk.red(`✖ Invalid location: "${location}"`));
+    error(`invalid location: "${location}"`);
     return;
   }
 
   if (parsed.type === 'git') {
     if (!(await validateGitRepo(parsed.baseUrl))) {
-      console.log(chalk.red(`✖ Git repository not accessible: ${parsed.baseUrl}`));
+      error(`git repository not accessible: ${parsed.baseUrl}`);
       return;
     }
     addSource({ type: 'git', name, location: parsed.baseUrl, path: parsed.subPath || undefined });
   } else {
     const result = validateLocalPath(location);
     if (!result.valid) {
-      console.log(chalk.red(`✖ ${result.error}`));
+      error(result.error ?? 'invalid local path');
       return;
     }
     addSource({ type: 'local', name, location: path.resolve(location) });
   }
 
-  console.log(chalk.green(`✓ Source "${name}" added`));
+  success(`Source "${name}" added`);
 }
 
 function handleRemove(name: string): void {
   if (!sourceExists(name)) {
-    console.log(chalk.red(`✖ Source "${name}" not found`));
+    error(`source "${name}" not found`);
     return;
   }
   removeSource(name);
-  console.log(chalk.green(`✓ Source "${name}" removed`));
+  success(`Source "${name}" removed`);
 }
 
 function handleList(): void {
   const sources = getSources();
   if (sources.length === 0) {
-    console.log(chalk.dim('No sources registered'));
+    dim('No sources registered');
     return;
   }
+  blank();
   for (const s of sources) {
     const loc = s.type === 'git' && s.path ? `${s.location} [path: ${s.path}]` : s.location;
-    console.log(`  ${chalk.cyan(s.name)}  ${chalk.dim('→')}  ${loc}`);
+    listItem(s.name, loc);
   }
+  blank();
 }
 
 export default function register(program: Command): void {

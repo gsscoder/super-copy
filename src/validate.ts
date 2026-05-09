@@ -9,10 +9,10 @@ export interface ValidationResult {
 export function validateLocalPath(dir: string): ValidationResult {
   const resolved = path.resolve(dir);
   if (!fs.existsSync(resolved)) {
-    return { valid: false, error: `Path does not exist: ${resolved}` };
+    return { valid: false, error: `path does not exist: ${resolved}` };
   }
   if (!fs.statSync(resolved).isDirectory()) {
-    return { valid: false, error: `Not a directory: ${resolved}` };
+    return { valid: false, error: `not a directory: ${resolved}` };
   }
   return { valid: true };
 }
