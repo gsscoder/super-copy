@@ -2,9 +2,10 @@ import Conf from 'conf';
 import envPaths from 'env-paths';
 import os from 'node:os';
 import path from 'node:path';
+import type { CopiesConfig, CopyRecord, Destination, ScopyConfig, Source } from './types.js';
 
 // WARNING: concurrent access is not supported — config.get/set sequences are not atomic and parallel processes will cause silent data loss.
-const config = new Conf({
+const config = new Conf<ScopyConfig>({
   cwd: path.join(os.homedir(), '.config', 'scopy'),
   configName: 'scopy',
   defaults: { sources: [], destinations: [], repo_pull_ttl_sec: 0, lastPullTimestamps: {} },
@@ -13,61 +14,39 @@ const config = new Conf({
 
 const dataPath = envPaths('scopy', { suffix: '' }).data;
 
-const copiesConfig = new Conf({
+const copiesConfig = new Conf<CopiesConfig>({
   cwd: dataPath,
   configName: 'scopy-register',
   defaults: { copies: [] },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
-/**
- * @returns {number}
- */
-export function getRepoPullTtlSec() {
+export function getRepoPullTtlSec(): number {
   return config.get('repo_pull_ttl_sec');
 }
 
-/**
- * @param {string} sourceName
- * @returns {string|null}
- */
-export function getLastPull(sourceName) {
+export function getLastPull(sourceName: string): string | null {
   const timestamps = config.get('lastPullTimestamps');
   return timestamps[sourceName] || null;
 }
 
-/**
- * @param {string} sourceName
- * @param {string} timestamp
- * @returns {void}
- */
-export function setLastPull(sourceName, timestamp) {
+export function setLastPull(sourceName: string, timestamp: string): void {
   const timestamps = config.get('lastPullTimestamps');
   timestamps[sourceName] = timestamp;
   config.set('lastPullTimestamps', timestamps);
 }
 
-/**
- * @returns {Array<{name: string, location: string, path?: string}>}
- */
-export function getSources() {
+export function getSources(): Source[] {
   return config.get('sources');
 }
 
-/**
- * @param {{name: string, location: string, path?: string}} source
- */
-export function addSource(source) {
+export function addSource(source: Source): void {
   const sources = getSources();
   sources.push(source);
   config.set('sources', sources);
 }
 
-/**
- * @param {string} name
- * @returns {boolean} true if removed, false if not found
- */
-export function removeSource(name) {
+export function removeSource(name: string): boolean {
   const sources = getSources();
   const index = sources.findIndex((s) => s.name === name);
   if (index === -1) {
@@ -78,35 +57,21 @@ export function removeSource(name) {
   return true;
 }
 
-/**
- * @param {string} name
- * @returns {boolean}
- */
-export function sourceExists(name) {
+export function sourceExists(name: string): boolean {
   return getSources().some((s) => s.name === name);
 }
 
-/**
- * @returns {Array<{name: string, location: string}>}
- */
-export function getDestinations() {
+export function getDestinations(): Destination[] {
   return config.get('destinations');
 }
 
-/**
- * @param {{name: string, location: string}} dest
- */
-export function addDestination(dest) {
+export function addDestination(dest: Destination): void {
   const destinations = getDestinations();
   destinations.push(dest);
   config.set('destinations', destinations);
 }
 
-/**
- * @param {string} name
- * @returns {boolean}
- */
-export function removeDestination(name) {
+export function removeDestination(name: string): boolean {
   const destinations = getDestinations();
   const index = destinations.findIndex((d) => d.name === name);
   if (index === -1) {
@@ -117,54 +82,36 @@ export function removeDestination(name) {
   return true;
 }
 
-/**
- * @param {string} name
- * @returns {boolean}
- */
-export function destinationExists(name) {
+export function destinationExists(name: string): boolean {
   return getDestinations().some((d) => d.name === name);
 }
 
-/**
- * @returns {Array<{source: string, destination: string, file: string, copiedAt: string}>}
- */
-export function getCopies() {
+export function getCopies(): CopyRecord[] {
   return copiesConfig.get('copies');
 }
 
-/**
- * @param {{source: string, destination: string, file: string, copiedAt?: string}} record
- */
-export function addCopy(record) {
+export function addCopy(record: CopyRecord): void {
   const copies = getCopies();
   const existing = copies.find(
     (c) => c.source === record.source && c.destination === record.destination && c.file === record.file
   );
   if (existing) {
-    existing.copiedAt = record.copiedAt || new Date().toISOString();
+    existing.copiedAt = record.copiedAt ?? new Date().toISOString();
   } else {
     copies.push({
       source: record.source,
       destination: record.destination,
       file: record.file,
-      copiedAt: record.copiedAt || new Date().toISOString(),
+      copiedAt: record.copiedAt ?? new Date().toISOString(),
     });
   }
   copiesConfig.set('copies', copies);
 }
 
-/**
- * @param {string} sourceName
- * @returns {Array<{source: string, destination: string, file: string, copiedAt: string}>}
- */
-export function getCopiesBySource(sourceName) {
+export function getCopiesBySource(sourceName: string): CopyRecord[] {
   return getCopies().filter((c) => c.source === sourceName);
 }
 
-/**
- * @param {string} destName
- * @returns {Array<{source: string, destination: string, file: string, copiedAt: string}>}
- */
-export function getCopiesByDestination(destName) {
+export function getCopiesByDestination(destName: string): CopyRecord[] {
   return getCopies().filter((c) => c.destination === destName);
 }

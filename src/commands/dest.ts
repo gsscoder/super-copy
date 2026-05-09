@@ -1,9 +1,10 @@
 import path from 'node:path';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { getDestinations, addDestination, removeDestination, destinationExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
 
-function handleAdd(name, location) {
+function handleAdd(name: string, location: string): void {
   if (destinationExists(name)) {
     console.log(chalk.red(`✖ Destination "${name}" already exists`));
     return;
@@ -19,7 +20,7 @@ function handleAdd(name, location) {
   console.log(chalk.green(`✓ Destination "${name}" added`));
 }
 
-function handleRemove(name) {
+function handleRemove(name: string): void {
   if (!destinationExists(name)) {
     console.log(chalk.red(`✖ Destination "${name}" not found`));
     return;
@@ -28,7 +29,7 @@ function handleRemove(name) {
   console.log(chalk.green(`✓ Destination "${name}" removed`));
 }
 
-function handleList() {
+function handleList(): void {
   const destinations = getDestinations();
   if (destinations.length === 0) {
     console.log(chalk.dim('No destinations registered'));
@@ -39,10 +40,7 @@ function handleList() {
   }
 }
 
-/**
- * @param {import('commander').Command} program
- */
-export default function register(program) {
+export default function register(program: Command): void {
   const dest = program
     .command('dest')
     .description('Manage asset destinations');

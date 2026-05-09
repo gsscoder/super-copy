@@ -1,7 +1,8 @@
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { getSources, getDestinations } from '../config.js';
 
-function handleList() {
+function handleList(): void {
   const sources = getSources();
   const destinations = getDestinations();
 
@@ -13,7 +14,7 @@ function handleList() {
     console.log(`  ${chalk.dim('No sources registered')}`);
   } else {
     for (const s of sources) {
-      const loc = s.path ? `${s.location} [path: ${s.path}]` : s.location;
+      const loc = s.type === 'git' && s.path ? `${s.location} [path: ${s.path}]` : s.location;
       console.log(`  ${chalk.cyan(s.name.padEnd(20))} ${chalk.dim('→')}  ${loc}`);
     }
   }
@@ -32,10 +33,7 @@ function handleList() {
   }
 }
 
-/**
- * @param {import('commander').Command} program
- */
-export default function register(program) {
+export default function register(program: Command): void {
   program
     .command('list')
     .description('List all registered sources and destinations')

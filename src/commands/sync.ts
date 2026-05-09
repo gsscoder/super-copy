@@ -4,6 +4,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import chalk from 'chalk';
 import envPaths from 'env-paths';
+import type { Command } from 'commander';
 import {
   getSources,
   sourceExists,
@@ -15,46 +16,27 @@ import {
   getRepoPullTtlSec,
 } from '../config.js';
 
-/**
- * @param {string} pattern
- * @returns {RegExp}
- */
-function globPattern(pattern) {
+function globPattern(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp('^' + escaped + '$');
 }
 
-/**
- * @param {string} msg
- * @returns {Promise<boolean>}
- */
-function confirm(msg) {
+function confirm(msg: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(msg, (answer) => {
+    rl.question(msg, (answer: string) => {
       rl.close();
       resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
     });
   });
 }
 
-/**
- * Ensure the git cache directory exists for a given source name.
- * @param {string} sourceName
- * @returns {string}
- */
-function gitCacheDir(sourceName) {
+function gitCacheDir(sourceName: string): string {
   const dataDir = envPaths('scopy', { suffix: '' }).data;
   return path.join(dataDir, 'repos', sourceName);
 }
 
-/**
- * Clone or pull a git source into the local cache.
- * @param {string} name
- * @param {string} url
- * @returns {Promise<void>}
- */
-async function ensureGitRepo(name, url) {
+async function ensureGitRepo(name: string, url: string): Promise<void> {
   const cacheDir = gitCacheDir(name);
   const gitDir = path.join(cacheDir, '.git');
 
@@ -79,7 +61,7 @@ async function ensureGitRepo(name, url) {
       console.log(chalk.green('done'));
     } catch (err) {
       console.log(chalk.red('failed'));
-      throw new Error(`Failed to pull git repo for "${name}": ${err.message}`);
+      throw new Error(`Failed to pull git repo for "${name}": ${err instanceof Error ? err.message : String(err)}`);
     }
   } else {
     process.stdout.write(`  ${chalk.dim('Cloning')} ${name}... `);
@@ -94,18 +76,12 @@ async function ensureGitRepo(name, url) {
       console.log(chalk.green('done'));
     } catch (err) {
       console.log(chalk.red('failed'));
-      throw new Error(`Failed to clone git repo for "${name}": ${err.message}`);
+      throw new Error(`Failed to clone git repo for "${name}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }
 
-/**
- * Resolve a list of file paths from a work tree and optional file spec.
- * @param {string} workTree
- * @param {string|undefined} fileSpec
- * @returns {Array<{src: string, rel: string}>}
- */
-function resolveFiles(workTree, fileSpec) {
+function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ src: string; rel: string }> {
   if (fileSpec === undefined) {
     return fs.readdirSync(workTree, { withFileTypes: true })
       .filter((e) => e.isFile())
@@ -148,17 +124,13 @@ function resolveFiles(workTree, fileSpec) {
   return [{ src: srcPath, rel: fileSpec }];
 }
 
-/**
- * @param {string} sourceSpec
- * @param {string} destName
- * @param {{force?: boolean, dryRun?: boolean}} options
- */
-async function handleSync(sourceSpec, destName, options) {
+async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
   const { force, dryRun } = options;
 
   // Parse source-spec
   const slashIndex = sourceSpec.indexOf('/');
-  let sourceName, fileSpec;
+  let sourceName: string;
+  let fileSpec: string | undefined;
   if (slashIndex === -1) {
     sourceName = sourceSpec;
     fileSpec = undefined;
@@ -181,13 +153,17 @@ async function handleSync(sourceSpec, destName, options) {
   const source = getSources().find((s) => s.name === sourceName);
   const dest = getDestinations().find((d) => d.name === destName);
 
+  if (source === undefined || dest === undefined) {
+    console.log(chalk.red('✖ Internal error: source or destination missing after validation'));
+    return;
+  }
+
   console.log(`  ${chalk.cyan(sourceName)} ${chalk.dim('→')} ${chalk.cyan(destName)}`);
 
   // Determine work tree
-  let workTree;
+  let workTree: string;
 
-  const isGitUrl = /^https?:\/\/|^ssh:\/\/|^git@/.test(source.location);
-  if (isGitUrl) {
+  if (source.type === 'git') {
     await ensureGitRepo(sourceName, source.location);
 
     const cacheDir = gitCacheDir(sourceName);
@@ -199,11 +175,11 @@ async function handleSync(sourceSpec, destName, options) {
   }
 
   // Resolve files
-  let files;
+  let files: Array<{ src: string; rel: string }>;
   try {
     files = resolveFiles(workTree, fileSpec);
   } catch (err) {
-    console.log(chalk.red(`✖ Error reading source files${fileSpec ? ` for "${fileSpec}"` : ''}: ${err.message}`));
+    console.log(chalk.red(`✖ Error reading source files${fileSpec ? ` for "${fileSpec}"` : ''}: ${err instanceof Error ? err.message : String(err)}`));
     return;
   }
 
@@ -223,7 +199,7 @@ async function handleSync(sourceSpec, destName, options) {
   // Copy files
   let copied = 0;
   let skipped = 0;
-  const copyErrors = [];
+  const copyErrors: Array<{ file: string; err: Error }> = [];
 
   for (const f of files) {
     const destPath = path.join(dest.location, f.rel);
@@ -251,8 +227,9 @@ async function handleSync(sourceSpec, destName, options) {
       console.log(`    ${chalk.green('✓')} ${f.rel}${existed ? chalk.dim(' (overwritten)') : ''}`);
       copied++;
     } catch (err) {
-      copyErrors.push({ file: f.rel, err });
-      console.error(`    ${chalk.red('✗')} ${f.rel}: ${err.message}`);
+      const error = err instanceof Error ? err : new Error(String(err));
+      copyErrors.push({ file: f.rel, err: error });
+      console.error(`    ${chalk.red('✗')} ${f.rel}: ${error.message}`);
     }
   }
 
@@ -265,11 +242,8 @@ async function handleSync(sourceSpec, destName, options) {
   }
 }
 
-/**
- * @param {import('commander').Command} program
- */
-export default function register(program) {
-  const syncCmd = program
+export default function register(program: Command): void {
+  program
     .command('sync')
     .description('Copy files from a source to a destination')
     .argument('<source-spec>', 'Source name with optional /path/file pattern')

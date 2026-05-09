@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "description": "File distribution utility for deploying assets from registered sources to registered destinations",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./dist/index.js",
   "bin": {
-    "scopy": "./src/scopy.js"
+    "scopy": "./dist/scopy.js"
   },
+  "files": ["dist"],
   "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/scopy.ts",
+    "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -18,5 +22,10 @@
     "commander": "^14.0.3",
     "conf": "^15.1.0",
     "simple-git": "^3.36.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
   }
 }

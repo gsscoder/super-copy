@@ -5,16 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import chalk from 'chalk';
 import envPaths from 'env-paths';
+import type { Command } from 'commander';
+import { isPackageJson } from '../types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), 'utf8'));
+const _raw: unknown = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), { encoding: 'utf8' }));
+if (!isPackageJson(_raw)) throw new Error('Invalid package.json shape');
+const pkg = _raw;
 
-/**
- * Display application information: version, config path, and repo clone path.
- *
- * @returns {void}
- */
-function handleInfo() {
+function handleInfo(): void {
   const configDir = path.join(os.homedir(), '.config', 'scopy');
   const configPath = path.join(configDir, 'scopy.json');
   const repoPath = path.join(envPaths('scopy', { suffix: '' }).data, 'repos');
@@ -27,10 +26,7 @@ function handleInfo() {
   console.log('');
 }
 
-/**
- * @param {import('commander').Command} program
- */
-export default function register(program) {
+export default function register(program: Command): void {
   program
     .command('info')
     .description('Display configuration and environment information')

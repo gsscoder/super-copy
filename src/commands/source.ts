@@ -1,14 +1,23 @@
 import { simpleGit } from 'simple-git';
 import path from 'node:path';
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { getSources, addSource, removeSource, sourceExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
 
-/**
- * @param {string} location
- * @returns {{type: 'git', baseUrl: string, subPath: string} | {type: 'local'}}
- */
-function parseLocation(location) {
+interface ParsedGitLocation {
+  type: 'git'
+  baseUrl: string
+  subPath: string
+}
+
+interface ParsedLocalLocation {
+  type: 'local'
+}
+
+type ParsedLocation = ParsedGitLocation | ParsedLocalLocation
+
+function parseLocation(location: string): ParsedLocation | null {
   if (location.startsWith('https://')) {
     const url = new URL(location);
     const segments = url.pathname.split('/').filter(Boolean);
@@ -22,11 +31,7 @@ function parseLocation(location) {
   return { type: 'local' };
 }
 
-/**
- * @param {string} url
- * @returns {Promise<boolean>}
- */
-async function validateGitRepo(url) {
+async function validateGitRepo(url: string): Promise<boolean> {
   try {
     const git = simpleGit();
     await git.listRemote(['--heads', url]);
@@ -36,7 +41,7 @@ async function validateGitRepo(url) {
   }
 }
 
-async function handleAdd(name, location) {
+async function handleAdd(name: string, location: string): Promise<void> {
   if (sourceExists(name)) {
     console.log(chalk.red(`✖ Source "${name}" already exists`));
     return;
@@ -53,20 +58,20 @@ async function handleAdd(name, location) {
       console.log(chalk.red(`✖ Git repository not accessible: ${parsed.baseUrl}`));
       return;
     }
-    addSource({ name, location: parsed.baseUrl, path: parsed.subPath || undefined });
+    addSource({ type: 'git', name, location: parsed.baseUrl, path: parsed.subPath || undefined });
   } else {
     const result = validateLocalPath(location);
     if (!result.valid) {
       console.log(chalk.red(`✖ ${result.error}`));
       return;
     }
-    addSource({ name, location: path.resolve(location) });
+    addSource({ type: 'local', name, location: path.resolve(location) });
   }
 
   console.log(chalk.green(`✓ Source "${name}" added`));
 }
 
-function handleRemove(name) {
+function handleRemove(name: string): void {
   if (!sourceExists(name)) {
     console.log(chalk.red(`✖ Source "${name}" not found`));
     return;
@@ -75,22 +80,19 @@ function handleRemove(name) {
   console.log(chalk.green(`✓ Source "${name}" removed`));
 }
 
-function handleList() {
+function handleList(): void {
   const sources = getSources();
   if (sources.length === 0) {
     console.log(chalk.dim('No sources registered'));
     return;
   }
   for (const s of sources) {
-    const loc = s.path ? `${s.location} [path: ${s.path}]` : s.location;
+    const loc = s.type === 'git' && s.path ? `${s.location} [path: ${s.path}]` : s.location;
     console.log(`  ${chalk.cyan(s.name)}  ${chalk.dim('→')}  ${loc}`);
   }
 }
 
-/**
- * @param {import('commander').Command} program
- */
-export default function register(program) {
+export default function register(program: Command): void {
   const source = program
     .command('source')
     .description('Manage asset sources');

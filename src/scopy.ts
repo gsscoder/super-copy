@@ -9,9 +9,12 @@ import registerDest from './commands/dest.js';
 import registerSync from './commands/sync.js';
 import registerInfo from './commands/info.js';
 import registerList from './commands/list.js';
+import { isPackageJson } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+const _raw: unknown = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), { encoding: 'utf8' }));
+if (!isPackageJson(_raw)) throw new Error('Invalid package.json shape');
+const pkg = _raw;
 
 program
   .name('scopy')

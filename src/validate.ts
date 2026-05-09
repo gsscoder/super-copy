@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * @param {string} dir
- * @returns {{valid: boolean, error?: string}}
- */
-export function validateLocalPath(dir) {
+export interface ValidationResult {
+  valid: boolean
+  error?: string
+}
+
+export function validateLocalPath(dir: string): ValidationResult {
   const resolved = path.resolve(dir);
   if (!fs.existsSync(resolved)) {
     return { valid: false, error: `Path does not exist: ${resolved}` };
