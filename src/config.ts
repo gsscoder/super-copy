@@ -5,14 +5,16 @@ import path from 'node:path';
 import type { CopiesConfig, CopyRecord, Destination, ScopyConfig, Source } from './types.js';
 
 // WARNING: concurrent access is not supported — config.get/set sequences are not atomic and parallel processes will cause silent data loss.
+const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'scopy');
+
 const config = new Conf<ScopyConfig>({
-  cwd: path.join(os.homedir(), '.config', 'scopy'),
+  cwd: configDir,
   configName: 'scopy',
   defaults: { sources: [], destinations: [], repo_pull_ttl_sec: 0, lastPullTimestamps: {} },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
-const dataPath = envPaths('scopy', { suffix: '' }).data;
+const dataPath = process.env.SCOPY_DATA_DIR ?? envPaths('scopy', { suffix: '' }).data;
 
 const copiesConfig = new Conf<CopiesConfig>({
   cwd: dataPath,

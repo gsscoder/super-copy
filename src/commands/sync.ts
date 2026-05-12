@@ -125,7 +125,7 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
   return [{ src: srcPath, rel: fileSpec }];
 }
 
-async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
+export async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
   const { force, dryRun } = options;
 
   // Parse source-spec
