@@ -117,3 +117,13 @@ export function getCopiesBySource(sourceName: string): CopyRecord[] {
 export function getCopiesByDestination(destName: string): CopyRecord[] {
   return getCopies().filter((c) => c.destination === destName);
 }
+
+export function purgeCopies(predicate: (r: CopyRecord) => boolean): number {
+  const copies = getCopies();
+  const kept = copies.filter((r) => !predicate(r));
+  const removed = copies.length - kept.length;
+  if (removed > 0) {
+    copiesConfig.set('copies', kept);
+  }
+  return removed;
+}

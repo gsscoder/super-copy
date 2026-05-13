@@ -11,6 +11,7 @@ import registerInfo from './commands/info.js';
 import registerList from './commands/list.js';
 import registerResync from './commands/resync.js';
 import registerLog from './commands/log.js';
+import registerPurge from './commands/purge.js';
 import { isPackageJson } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,5 +31,6 @@ registerInfo(program);
 registerList(program);
 registerResync(program);
 registerLog(program);
+registerPurge(program);
 
 program.parse();
