@@ -9,6 +9,7 @@ import registerDest from './commands/dest.js';
 import registerSync from './commands/sync.js';
 import registerInfo from './commands/info.js';
 import registerList from './commands/list.js';
+import registerResync from './commands/resync.js';
 import { isPackageJson } from './types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,5 +27,6 @@ registerDest(program);
 registerSync(program);
 registerInfo(program);
 registerList(program);
+registerResync(program);
 
 program.parse();
