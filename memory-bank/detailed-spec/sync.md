@@ -1,5 +1,4 @@
 # Sync
-
 Command for copying files from a registered source to a registered destination. Handles git and local sources, optional file filtering, overwrite confirmation, and a persistent copies registry.
 
 ## Command Signature
@@ -44,17 +43,3 @@ Schema of `<envPaths('scopy').data>/scopy-register.json`:
 - Errors if source name not registered
 - Errors if destination name not registered
 - Silently skips if no files match the spec
-
-## Resync
-Re-copies all previously synced files for a destination. Unlike `sync`, requires only a destination — files are resolved from the copies registry
-
-### Command Signature
-`scopy resync <dest> [--dry-run]`
-
-### Resolution
-- Reads all registry entries where `destination` matches `<dest>`
-- Groups entries by source name
-- Handles and reports errors consistently
-
-### Copy Behaviour
-Files are overwritten without confirmation. Each copied file updates its registry entry timestamp via `addCopy` upsert. Summary printed on completion
