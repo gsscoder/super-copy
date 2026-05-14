@@ -61,6 +61,31 @@ describe('sync', () => {
   });
 
   // ── Test 4 ──
+  it('glob with subdirectory prefix copies files to dest root (no subdir wrapper)', async () => {
+    populateSource(dirs.source, { 'subdir/a.md': 'md', 'subdir/b.md': 'md2', 'subdir/x.txt': 'txt' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/subdir/*.md', 'test-dst', {});
+
+    const destFiles = fs.readdirSync(dirs.dest);
+    expect(destFiles).toEqual(expect.arrayContaining(['a.md', 'b.md']));
+    expect(destFiles).not.toContain('x.txt');
+    expect(destFiles).not.toContain('subdir');
+    expect(destFiles).toHaveLength(2);
+  });
+
+  // ── Test 5 ──
+  it('directory spec expands contents to dest root (no subdir wrapper)', async () => {
+    populateSource(dirs.source, { 'subdir/a.txt': 'alpha', 'subdir/b.txt': 'bravo' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/subdir', 'test-dst', {});
+
+    const destFiles = fs.readdirSync(dirs.dest);
+    expect(destFiles).toEqual(expect.arrayContaining(['a.txt', 'b.txt']));
+    expect(destFiles).not.toContain('subdir');
+    expect(destFiles).toHaveLength(2);
+  });
+
+  // ── Test 6 ──
   it('copies nested file preserving relative path', async () => {
     populateSource(dirs.source, { 'subdir/file.txt': 'nested' });
     const { handleSync } = await import('../src/commands/sync.js');
@@ -71,7 +96,7 @@ describe('sync', () => {
     expect(fs.readFileSync(nestedPath, 'utf8')).toBe('nested');
   });
 
-  // ── Test 5 ──
+  // ── Test 7 ──
   it('dry-run does not write files', async () => {
     populateSource(dirs.source, { 'a.txt': 'alpha' });
     const { handleSync } = await import('../src/commands/sync.js');
@@ -80,7 +105,7 @@ describe('sync', () => {
     expect(fs.existsSync(path.join(dirs.dest, 'a.txt'))).toBe(false);
   });
 
-  // ── Test 6 ──
+  // ── Test 8 ──
   it('force overwrites existing files', async () => {
     populateSource(dirs.source, { 'a.txt': 'new content' });
     // pre-create file in dest with old content
@@ -93,7 +118,7 @@ describe('sync', () => {
     expect(fs.readFileSync(path.join(dirs.dest, 'a.txt'), 'utf8')).toBe('new content');
   });
 
-  // ── Test 7 ──
+  // ── Test 9 ──
   it('silent no-match — no files copied', async () => {
     populateSource(dirs.source, { 'a.txt': 'alpha' });
     const { handleSync } = await import('../src/commands/sync.js');
@@ -102,7 +127,7 @@ describe('sync', () => {
     expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 
-  // ── Test 8 ──
+  // ── Test 10 ──
   it('errors on unregistered source', async () => {
     const { handleSync } = await import('../src/commands/sync.js');
     await expect(
@@ -112,7 +137,7 @@ describe('sync', () => {
     expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 
-  // ── Test 9 ──
+  // ── Test 11 ──
   it('errors on unregistered destination', async () => {
     const { handleSync } = await import('../src/commands/sync.js');
     await expect(
@@ -122,7 +147,7 @@ describe('sync', () => {
     expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 
-  // ── Test 10 ──
+  // ── Test 12 ──
   it('rejects path traversal in fileSpec', async () => {
     populateSource(dirs.source, { 'a.txt': 'alpha' });
     const { handleSync } = await import('../src/commands/sync.js');
@@ -136,7 +161,7 @@ describe('sync', () => {
     expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 
-  // ── Test 11 ──
+  // ── Test 13 ──
   it('rejects non-http git URL at clone', async () => {
     // Fresh config with git source using non-http URL
     cleanup(dirs);
@@ -152,7 +177,7 @@ describe('sync', () => {
     ).rejects.toThrow(/Refusing to clone/);
   });
 
-  // ── Test 12 ──
+  // ── Test 14 ──
   it('updates copies registry after copy', async () => {
     populateSource(dirs.source, { 'a.txt': 'alpha' });
     const { handleSync } = await import('../src/commands/sync.js');

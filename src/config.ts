@@ -98,13 +98,24 @@ export function addCopy(record: CopyRecord): void {
     (c) => c.source === record.source && c.destination === record.destination && c.file === record.file
   );
   if (existing) {
+    // Upsert: update copiedAt only; never reassign index or ghosted
     existing.copiedAt = record.copiedAt ?? new Date().toISOString();
+    // Migration: assign index if missing
+    if (existing.index === undefined) {
+      existing.index = getNextIndex(existing.destination);
+    }
+    // Migration: default ghosted to false if missing
+    if (existing.ghosted === undefined) {
+      existing.ghosted = false;
+    }
   } else {
     copies.push({
       source: record.source,
       destination: record.destination,
       file: record.file,
       copiedAt: record.copiedAt ?? new Date().toISOString(),
+      index: getNextIndex(record.destination),
+      ghosted: false,
     });
   }
   copiesConfig.set('copies', copies);
@@ -126,4 +137,34 @@ export function purgeCopies(predicate: (r: CopyRecord) => boolean): number {
     copiesConfig.set('copies', kept);
   }
   return removed;
+}
+
+export function getNextIndex(destName: string): number {
+  const copies = getCopiesByDestination(destName);
+  const maxIndex = copies.reduce((max, c) => {
+    const idx = c.index ?? 0;
+    return idx > max ? idx : max;
+  }, 0);
+  return maxIndex + 1;
+}
+
+export function getCopyByIndex(destName: string, index: number): CopyRecord | undefined {
+  return getCopiesByDestination(destName).find((c) => c.index === index);
+}
+
+export function setGhosted(destName: string, index: number, ghosted: boolean): boolean {
+  const copies = getCopies();
+  const record = copies.find((c) => c.destination === destName && c.index === index);
+  if (!record) return false;
+  record.ghosted = ghosted;
+  copiesConfig.set('copies', copies);
+  return true;
+}
+
+export function fileCacheDir(destName: string): string {
+  return path.join(dataPath, 'cache', destName);
+}
+
+export function fileCachePath(destName: string, index: number): string {
+  return path.join(fileCacheDir(destName), String(index));
 }

@@ -1,24 +1,31 @@
 import type { Command } from 'commander';
-import { getCopies, getCopiesByDestination, getDestinations, destinationExists } from '../config.js';
+import {
+  getCopies,
+  getCopiesByDestination,
+  getDestinations,
+  destinationExists,
+} from '../config.js';
 import { heading, dim, blank, error } from '../ui.js';
+import type { CopyRecord } from '../types.js';
 import chalk from 'chalk';
 
-function printDestGroup(destName: string, files: Array<{ file: string; copiedAt: string | undefined }>): void {
+function printDestGroup(destName: string, records: CopyRecord[]): void {
   heading(destName);
 
-  if (files.length === 0) {
+  if (records.length === 0) {
     dim('no tracked files');
     return;
   }
 
-  const indexWidth = String(files.length).length;
-  const nameWidth = Math.max(...files.map((f) => f.file.length));
+  const indexWidth = String(Math.max(...records.map((r) => r.index ?? 0), records.length)).length;
+  const nameWidth = Math.max(...records.map((r) => r.file.length));
 
-  for (let i = 0; i < files.length; i++) {
-    const index = String(i + 1).padStart(indexWidth);
-    const name = files[i].file.padEnd(nameWidth);
-    const ts = chalk.dim(files[i].copiedAt ?? '');
-    console.log(`  ${index}  ${name}  ${ts}`);
+  for (const r of records) {
+    const idx = String(r.index ?? '?').padStart(indexWidth);
+    const name = r.file.padEnd(nameWidth);
+    const ts = chalk.dim(r.copiedAt ?? '');
+    const ghosted = r.ghosted ? chalk.dim(' [ghosted]') : '';
+    console.log(`  ${idx}  ${name}  ${ts}${ghosted}`);
   }
 }
 
@@ -29,7 +36,7 @@ function handleLog(dest: string | undefined): void {
       process.exit(1);
     }
     const copies = getCopiesByDestination(dest);
-    printDestGroup(dest, copies.map((c) => ({ file: c.file, copiedAt: c.copiedAt })));
+    printDestGroup(dest, copies);
     return;
   }
 
@@ -47,7 +54,7 @@ function handleLog(dest: string | undefined): void {
   for (let i = 0; i < withFiles.length; i++) {
     const d = withFiles[i];
     const copies = allCopies.filter((c) => c.destination === d.name);
-    printDestGroup(d.name, copies.map((c) => ({ file: c.file, copiedAt: c.copiedAt })));
+    printDestGroup(d.name, copies);
     if (i < withFiles.length - 1) blank();
   }
 

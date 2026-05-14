@@ -13,6 +13,9 @@ import {
   setLastPull,
   getRepoPullTtlSec,
   getCopiesByDestination,
+  fileCacheDir,
+  fileCachePath,
+  setGhosted,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 import type { CopyRecord, Source } from '../types.js';
@@ -62,6 +65,7 @@ async function ensureGitRepo(name: string, url: string): Promise<void> {
 
 interface ResyncOptions {
   dryRun: boolean;
+  unghost: boolean;
 }
 
 export default function registerResync(program: Command): void {
@@ -69,6 +73,7 @@ export default function registerResync(program: Command): void {
     .command('resync <dest>')
     .description('Re-copy all tracked files to a destination')
     .option('--dry-run', 'Preview what would be copied without making changes')
+    .option('--unghost', 'Restore ghosted files from cache')
     .action(async (dest: string, opts: ResyncOptions) => {
       const dryRun = opts.dryRun;
 
@@ -90,9 +95,62 @@ export default function registerResync(program: Command): void {
         return;
       }
 
+      const ghostedRecords = records.filter((r) => r.ghosted);
+      const activeRecords = records.filter((r) => !r.ghosted);
+
+      // --unghost: restore ghosted files from cache
+      if (opts.unghost) {
+        if (ghostedRecords.length === 0) {
+          dim('No ghosted files to restore');
+          return;
+        }
+
+        if (dryRun) {
+          console.log(`Would restore ${ghostedRecords.length} ghosted file(s):`);
+          for (const record of ghostedRecords) {
+            console.log(chalk.dim(`· ${record.file}`));
+          }
+          return;
+        }
+
+        let restored = 0;
+        let errs = 0;
+        for (const record of ghostedRecords) {
+          if (record.index === undefined) {
+            console.log(`❌ ${record.file}: missing index, cannot restore`);
+            errs++;
+            continue;
+          }
+          const cachePath = fileCachePath(dest, record.index);
+          if (!fs.existsSync(cachePath)) {
+            console.log(`❌ ${record.file}: cache not found, cannot restore`);
+            errs++;
+            continue;
+          }
+          const destPath = path.join(destination.location, record.file);
+          fs.mkdirSync(path.dirname(destPath), { recursive: true });
+          fs.copyFileSync(cachePath, destPath);
+          setGhosted(dest, record.index, false);
+          addCopy({
+            source: record.source,
+            destination: dest,
+            file: record.file,
+            copiedAt: new Date().toISOString(),
+          });
+          console.log(`${chalk.green('✓')} ${record.file} (restored from cache)`);
+          restored++;
+        }
+
+        const restoredStr = chalk.green(String(restored));
+        const errStr = errs > 0 ? chalk.red(`${errs} error(s)`) : `${errs} error(s)`;
+        console.log(`${restoredStr} restored, ${errStr}`);
+        if (errs > 0) process.exitCode = 1;
+        return;
+      }
+
       // Group records by source name
       const bySource = new Map<string, CopyRecord[]>();
-      for (const record of records) {
+      for (const record of activeRecords) {
         const group = bySource.get(record.source);
         if (group !== undefined) {
           group.push(record);
@@ -176,6 +234,10 @@ export default function registerResync(program: Command): void {
           const destPath = path.join(destination.location, record.file);
           fs.mkdirSync(path.dirname(destPath), { recursive: true });
           fs.copyFileSync(srcPath, destPath);
+          if (record.index !== undefined) {
+            fs.mkdirSync(fileCacheDir(dest), { recursive: true });
+            fs.copyFileSync(srcPath, fileCachePath(dest, record.index));
+          }
           addCopy({
             source: sourceName,
             destination: dest,

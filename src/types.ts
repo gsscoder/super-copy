@@ -23,6 +23,8 @@ export interface CopyRecord {
   destination: string
   file: string
   copiedAt?: string
+  index?: number
+  ghosted?: boolean
 }
 
 export interface ScopyConfig {

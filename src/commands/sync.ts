@@ -14,6 +14,9 @@ import {
   getLastPull,
   setLastPull,
   getRepoPullTtlSec,
+  getCopiesByDestination,
+  fileCacheDir,
+  fileCachePath,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 
@@ -109,7 +112,7 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
       .filter((e) => e.isFile() && regex.test(e.name))
       .map((e) => ({
         src: path.join(dirPath, e.name),
-        rel: dirPart ? path.join(dirPart, e.name) : e.name,
+        rel: e.name,
       }));
   }
 
@@ -121,6 +124,11 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
   }
   if (!fs.existsSync(srcPath)) {
     return [];
+  }
+  if (fs.statSync(srcPath).isDirectory()) {
+    return fs.readdirSync(srcPath, { withFileTypes: true })
+      .filter((e) => e.isFile())
+      .map((e) => ({ src: path.join(srcPath, e.name), rel: e.name }));
   }
   return [{ src: srcPath, rel: fileSpec }];
 }
@@ -222,6 +230,13 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
         file: f.rel,
         copiedAt: new Date().toISOString(),
       });
+
+      const copies = getCopiesByDestination(destName);
+      const record = copies.find((c) => c.source === sourceName && c.file === f.rel);
+      if (record && record.index !== undefined) {
+        fs.mkdirSync(fileCacheDir(destName), { recursive: true });
+        fs.copyFileSync(f.src, fileCachePath(destName, record.index));
+      }
 
       console.log(`${chalk.green('✓')} ${f.rel}${existed ? chalk.dim(' (overwritten)') : ''}`);
       copied++;

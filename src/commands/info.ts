@@ -18,10 +18,12 @@ function handleInfo(): void {
   const configDir = path.join(os.homedir(), '.config', 'scopy');
   const configPath = path.join(configDir, 'scopy.json');
   const repoPath = path.join(envPaths('scopy', { suffix: '' }).data, 'repos');
+  const registerPath = path.join(envPaths('scopy', { suffix: '' }).data, 'scopy-register.json');
 
   console.log(`${chalk.bold.white(pkg.name)} ${chalk.dim(`v${pkg.version}`)}`)
   keyValue('config', configPath);
   keyValue('clone path', repoPath);
+  keyValue('register', registerPath);
 }
 
 export default function register(program: Command): void {

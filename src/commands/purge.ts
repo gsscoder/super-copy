@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import envPaths from 'env-paths';
 import { Command } from 'commander';
 import { getCopies, purgeCopies } from '../config.js';
+import type { CopyRecord } from '../types.js';
 import { dim } from '../ui.js';
 
 interface PurgeOptions {
@@ -11,7 +12,6 @@ interface PurgeOptions {
 }
 
 interface PurgeLogOptions {
-  olderThan?: string;
   dryRun: boolean;
 }
 
@@ -51,34 +51,17 @@ function handlePurgeRepos(opts: PurgeOptions): void {
   console.log(`${repoDirs.length} repo(s) removed`);
 }
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function allPredicate(): (r: CopyRecord) => boolean {
+  return (): boolean => true;
 }
 
-function handlePurgeLog(opts: PurgeLogOptions): void {
-  if (opts.olderThan === undefined) {
-    dim('nothing to purge (use --older-than to specify age threshold)');
-    return;
-  }
+function byDestinationPredicate(destName: string): (r: CopyRecord) => boolean {
+  return (r): boolean => r.destination === destName;
+}
 
-  const days = parseInt(opts.olderThan, 10);
-  if (isNaN(days) || days <= 0) {
-    console.log(chalk.red('--older-than must be a non-negative integer'));
-    process.exitCode = 1;
-    return;
-  }
-
-  const todayStart = startOfDay(new Date());
-  const cutoff = new Date(todayStart.getTime() - days * 24 * 60 * 60 * 1000);
-
-  const shouldPurge = (copiedAt: string | undefined): boolean => {
-    if (copiedAt === undefined) return true;
-    const d = new Date(copiedAt);
-    return startOfDay(d) < cutoff;
-  };
-
-  if (opts.dryRun) {
-    const candidates = getCopies().filter((r) => shouldPurge(r.copiedAt));
+function applyPurge(predicate: (r: CopyRecord) => boolean, dryRun: boolean): void {
+  if (dryRun) {
+    const candidates = getCopies().filter(predicate);
     console.log(`Would remove ${candidates.length} entr${candidates.length === 1 ? 'y' : 'ies'}:`);
     for (const r of candidates) {
       console.log(chalk.dim(`· ${r.file} (${r.source} → ${r.destination})`));
@@ -86,8 +69,22 @@ function handlePurgeLog(opts: PurgeLogOptions): void {
     return;
   }
 
-  const removed = purgeCopies((r) => shouldPurge(r.copiedAt));
+  const removed = purgeCopies(predicate);
   console.log(`${removed} entr${removed === 1 ? 'y' : 'ies'} removed`);
+}
+
+function handlePurgeLog(dest: string | undefined, opts: PurgeLogOptions): void {
+  if (dest === '*') {
+    applyPurge(allPredicate(), opts.dryRun);
+    return;
+  }
+
+  if (dest !== undefined) {
+    applyPurge(byDestinationPredicate(dest), opts.dryRun);
+    return;
+  }
+
+  dim('nothing to purge (provide a destination or * for all)');
 }
 
 export default function registerPurge(program: Command): void {
@@ -100,11 +97,10 @@ export default function registerPurge(program: Command): void {
     .action((opts: PurgeOptions) => handlePurgeRepos(opts));
 
   purge
-    .command('log')
-    .description('Remove copy log entries older than a given number of days')
-    .option('--older-than <days>', 'Remove entries older than this many days')
+    .command('log [dest]')
+    .description('Remove copy log entries by destination (* = all, <name> = named dest) or by age (--older-than)')
     .option('--dry-run', 'Show what would be removed without modifying the registry')
-    .action((opts: PurgeLogOptions) => handlePurgeLog(opts));
+    .action((dest: string | undefined, opts: PurgeLogOptions) => handlePurgeLog(dest, opts));
 
   program.addCommand(purge);
 }
