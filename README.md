@@ -10,11 +10,11 @@ Designed for single-user, local workflows: dotfiles, config files, Claude Code a
 npm install -g @koder0x/scopy@next
 ```
 
-> Stable release coming soon. `@next` installs the current release candidate.
+> Current version: `0.2.0-rc.1` — stable release coming soon. `@next` installs the current release candidate.
 
 ## How it works
 
-Register sources (git repos or local directories) and destinations (local directories), then sync files between them. Every copy is tracked so you can re-sync, inspect history, or ghost files without losing the originals.
+Register sources (GitHub repos or local directories) and destinations (local directories), then sync files between them. GitHub sources are fetched directly via the GitHub API — no local Git installation required. Every copy is tracked so you can re-sync, inspect history, or ghost files without losing the originals.
 
 ## Commands
 
@@ -30,7 +30,6 @@ Register sources (git repos or local directories) and destinations (local direct
 | `scopy resync [dest]` | Re-copy tracked files from their original sources |
 | `scopy log [dest]` | Show copy history |
 | `scopy ghost <dest> <index>` | Soft-remove a tracked file (preserves cache for restore) |
-| `scopy purge repos` | Delete cached git repos |
 | `scopy purge log [dest]` | Clear copy log entries |
 | `scopy info` | Show config file location and registered locations |
 
@@ -38,7 +37,7 @@ Register sources (git repos or local directories) and destinations (local direct
 
 ```sh
 # Register a dotfiles repo and a target directory
-scopy source add dotfiles https://github.com/you/dotfiles.git
+scopy source add dotfiles https://github.com/you/dotfiles
 scopy dest add home ~
 
 # Copy everything
@@ -54,7 +53,6 @@ scopy resync home --dry-run
 ## Requirements
 
 - Node.js >= 20
-- Git (for remote sources)
 
 ## License
 

@@ -149,21 +149,6 @@ describe('sync', () => {
     expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 
-  it('rejects non-http git URL at clone', async () => {
-    // Fresh config with git source using non-http URL
-    cleanup(dirs);
-    vi.resetModules();
-    dirs = makeTempDirs();
-    process.env.SCOPY_CONFIG_DIR = dirs.config;
-    process.env.SCOPY_DATA_DIR = dirs.data;
-    await registerGitSource(dirs, 'ext::evil');
-
-    const { handleSync } = await import('../src/commands/sync.js');
-    await expect(
-      handleSync('test-src', 'test-dst', {}),
-    ).rejects.toThrow(/Refusing to clone/);
-  });
-
   it('updates copies registry after copy', async () => {
     populateSource(dirs.source, { 'a.txt': 'alpha' });
     const { handleSync } = await import('../src/commands/sync.js');

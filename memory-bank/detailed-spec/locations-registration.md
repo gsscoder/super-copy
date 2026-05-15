@@ -24,7 +24,7 @@ Location: `~/.config/scopy/scopy.json` (user home, `.config/scopy/` directory); 
 
 ## Source Command
 `scopy source` manages the set of registered asset sources
-To add a source, run `scopy source add <name> <location>`. The location is parsed to determine its type. Git URLs must start with `https://` — SSH (`git@`) is rejected. An optional sub-path is extracted: `https://github.com/owner/repo/path/to/dir` resolves to base repo `https://github.com/owner/repo` with sub-path `/path/to/dir`
+To add a source, run `scopy source add <name> <location>`. The location is parsed to determine its type. Git URLs must match `https://github.com/{owner}/{repo}[/{subpath}]` exactly — non-GitHub HTTPS URLs and SSH (`git@`) are rejected. An optional sub-path is extracted: `https://github.com/owner/repo/path/to/dir` resolves to base repo `https://github.com/owner/repo` with sub-path `/path/to/dir`. No network call is made during registration.
 Local paths are resolved to an absolute path and validated to exist as a directory (not a file)
 To remove a source, run `scopy source remove <name>`. Errors if the name is not found
 To list all registered sources, run `scopy source list`
@@ -36,5 +36,5 @@ To remove a destination, run `scopy dest remove <name>`. Errors if the name is n
 To list all registered destinations, run `scopy dest list`
 
 ## Validation
-- Git URLs & Local paths must exist
+- Git URLs must match the `https://github.com/{owner}/{repo}` pattern; local paths must exist as directories
 - Rejects duplicated names

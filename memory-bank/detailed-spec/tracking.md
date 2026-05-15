@@ -13,7 +13,7 @@ Re-copies all tracked active files for a destination from their original sources
 ### Resolution
 - Reads all registry entries where `destination` matches `<dest>`
 - Groups entries by source name
-- Handles git sources (clone with `--depth 1` on first use, pull on subsequent; TTL-gated) and local sources
+- Handles git sources (fetches each file from `https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{subPath}/{file}`) and local sources
 
 ### Copy Behaviour
 Files are overwritten without confirmation. Each copied file updates its registry entry via `addCopy` upsert (`copiedAt` timestamp) and refreshes the file cache at `fileCachePath(dest, index)`
@@ -65,13 +65,7 @@ Copies from `fileCachePath(dest, index)` back to the destination directory. Sets
 - Errors if cache file missing on restore
 
 ## Purge
-Deletes cached data from repos or the copy log
-
-### `purge repos`
-`scopy purge repos [--dry-run]`
-
-Deletes all cloned git repo cache directories under `<envPaths('scopy').data>/repos`
-- `--dry-run`: lists directories without deleting
+Deletes cached data from the copy log
 
 ### `purge log`
 `scopy purge log [dest] [--dry-run]`

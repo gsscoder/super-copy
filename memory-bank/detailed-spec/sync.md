@@ -14,10 +14,10 @@ Command for copying files from a registered source to a registered destination. 
 - `/<path>`: e.g. `mysource/CLAUDE.md` — copies a single specific file
 
 ## Git Source Handling
-Git sources (location starts with `https://`) are cached locally at `<envPaths('scopy').data>/repos/<sourceName>`
-- First sync: repository cloned with `--depth 1`
-- Subsequent syncs: pulled to latest
-- If source has a `path` field, work tree is `<cacheDir>/<source.path>`
+Git sources (GitHub HTTPS URLs) are fetched directly from the GitHub API — no local clone is made.
+- File listing fetched from `https://api.github.com/repos/{owner}/{repo}/contents/{path}`
+- Each file downloaded from `https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}`
+- If source has a `path` field, it is appended to both the contents and raw URLs
 
 ## Copy Behaviour
 Files are copied flat into the destination directory (basename only — no subdirectory structure preserved)

@@ -1,4 +1,3 @@
-import { simpleGit } from 'simple-git';
 import path from 'node:path';
 import type { Command } from 'commander';
 import { getSources, addSource, removeSource, sourceExists } from '../config.js';
@@ -20,6 +19,9 @@ type ParsedLocation = ParsedGitLocation | ParsedLocalLocation
 function parseLocation(location: string): ParsedLocation | null {
   if (location.startsWith('https://')) {
     const url = new URL(location);
+    if (url.host !== 'github.com') {
+      return null;
+    }
     const segments = url.pathname.split('/').filter(Boolean);
     if (segments.length < 2) {
       return null;
@@ -29,16 +31,6 @@ function parseLocation(location: string): ParsedLocation | null {
     return { type: 'git', baseUrl, subPath };
   }
   return { type: 'local' };
-}
-
-async function validateGitRepo(url: string): Promise<boolean> {
-  try {
-    const git = simpleGit();
-    await git.listRemote(['--heads', url]);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function handleAdd(name: string, location: string): Promise<void> {
@@ -54,10 +46,6 @@ async function handleAdd(name: string, location: string): Promise<void> {
   }
 
   if (parsed.type === 'git') {
-    if (!(await validateGitRepo(parsed.baseUrl))) {
-      error(`git repository not accessible: ${parsed.baseUrl}`);
-      return;
-    }
     addSource({ type: 'git', name, location: parsed.baseUrl, path: parsed.subPath || undefined });
   } else {
     const result = validateLocalPath(location);

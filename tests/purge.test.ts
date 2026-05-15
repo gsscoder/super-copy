@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -89,45 +88,4 @@ describe('purge', () => {
     expect(getCopies()).toHaveLength(1);
   });
 
-  it('purge repos deletes all repo dirs', async () => {
-    // Seed: create two directories under repos
-    const reposDir = path.join(dirs.data, 'repos');
-    fs.mkdirSync(path.join(reposDir, 'repo-one'), { recursive: true });
-    fs.mkdirSync(path.join(reposDir, 'repo-two'), { recursive: true });
-    expect(fs.existsSync(path.join(reposDir, 'repo-one'))).toBe(true);
-    expect(fs.existsSync(path.join(reposDir, 'repo-two'))).toBe(true);
-
-    // Run purge repos
-    const { handlePurgeRepos } = await import('../src/commands/purge.js');
-    handlePurgeRepos({ dryRun: false });
-
-    // Assert both dirs removed; repos dir itself still exists
-    expect(fs.existsSync(path.join(reposDir, 'repo-one'))).toBe(false);
-    expect(fs.existsSync(path.join(reposDir, 'repo-two'))).toBe(false);
-    expect(fs.existsSync(reposDir)).toBe(true);
-  });
-
-  it('purge repos --dry-run does not delete', async () => {
-    // Seed: create one directory under repos
-    const reposDir = path.join(dirs.data, 'repos');
-    fs.mkdirSync(path.join(reposDir, 'repo-one'), { recursive: true });
-    expect(fs.existsSync(path.join(reposDir, 'repo-one'))).toBe(true);
-
-    // Run purge repos --dry-run
-    const { handlePurgeRepos } = await import('../src/commands/purge.js');
-    handlePurgeRepos({ dryRun: true });
-
-    // Assert dir still exists
-    expect(fs.existsSync(path.join(reposDir, 'repo-one'))).toBe(true);
-  });
-
-  it('purge repos no-op when repos dir absent', async () => {
-    // Ensure repos dir does not exist
-    const reposDir = path.join(dirs.data, 'repos');
-    expect(fs.existsSync(reposDir)).toBe(false);
-
-    // Run purge repos — should not throw
-    const { handlePurgeRepos } = await import('../src/commands/purge.js');
-    expect(() => handlePurgeRepos({ dryRun: false })).not.toThrow();
-  });
 });

@@ -30,8 +30,6 @@ export interface CopyRecord {
 export interface ScopyConfig {
   sources: Source[]
   destinations: Destination[]
-  repo_pull_ttl_sec: number
-  lastPullTimestamps: Record<string, string>
 }
 
 export interface CopiesConfig {

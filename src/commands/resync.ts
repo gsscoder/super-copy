@@ -1,17 +1,12 @@
-import { simpleGit } from 'simple-git';
 import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
-import envPaths from 'env-paths';
 import type { Command } from 'commander';
 import {
   getSources,
   getDestinations,
   destinationExists,
   addCopy,
-  getLastPull,
-  setLastPull,
-  getRepoPullTtlSec,
   getCopiesByDestination,
   fileCacheDir,
   fileCachePath,
@@ -19,49 +14,6 @@ import {
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 import type { CopyRecord, Source } from '../types.js';
-
-function gitCacheDir(sourceName: string): string {
-  const dataDir = envPaths('scopy', { suffix: '' }).data;
-  return path.join(dataDir, 'repos', sourceName);
-}
-
-async function ensureGitRepo(name: string, url: string): Promise<void> {
-  const cacheDir = gitCacheDir(name);
-  const gitDir = path.join(cacheDir, '.git');
-  if (fs.existsSync(gitDir)) {
-    const ttl = getRepoPullTtlSec();
-    if (ttl > 0) {
-      const lastPull = getLastPull(name);
-      if (lastPull !== null) {
-        const elapsed = (Date.now() - new Date(lastPull).getTime()) / 1000;
-        if (elapsed < ttl) { dim('Up-to-date (cached)'); return; }
-      }
-    }
-    process.stdout.write(`${chalk.dim('Fetching')} ${name}... `);
-    try {
-      const git = simpleGit(cacheDir);
-      await git.pull();
-      setLastPull(name, new Date().toISOString());
-      console.log(chalk.green('done'));
-    } catch (err) {
-      console.log(chalk.red('failed'));
-      throw new Error(`Failed to pull git repo for "${name}": ${err instanceof Error ? err.message : String(err)}`);
-    }
-  } else {
-    process.stdout.write(`${chalk.dim('Cloning')} ${name}... `);
-    try {
-      if (!/^https?:\/\//.test(url)) throw new Error(`Refusing to clone "${url}": only http:// and https:// URLs are allowed`);
-      fs.mkdirSync(path.dirname(cacheDir), { recursive: true });
-      const git = simpleGit();
-      await git.clone(url, cacheDir, ['--depth', '1']);
-      setLastPull(name, new Date().toISOString());
-      console.log(chalk.green('done'));
-    } catch (err) {
-      console.log(chalk.red('failed'));
-      throw new Error(`Failed to clone git repo for "${name}": ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-}
 
 export interface ResyncOptions {
   dryRun: boolean;
@@ -167,14 +119,14 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
             continue;
           }
 
-          let workTree: string;
           if (source.type === 'git') {
-            const cacheDir = gitCacheDir(sourceName);
-            workTree = source.path !== undefined ? path.join(cacheDir, source.path.replace(/^\//, '')) : cacheDir;
-          } else {
-            workTree = source.location;
+            for (const record of group) {
+              validFiles.push(record.file);
+            }
+            continue;
           }
 
+          const workTree: string = source.location;
           for (const record of group) {
             const srcPath = path.join(workTree, record.file);
             if (!fs.existsSync(srcPath)) {
@@ -206,16 +158,43 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         }
 
         if (source.type === 'git') {
-          await ensureGitRepo(sourceName, source.location);
+          // Parse owner/repo from stored location (https://github.com/{owner}/{repo})
+          const urlParts = new URL(source.location).pathname.split('/').filter(Boolean);
+          const owner = urlParts[0];
+          const repo = urlParts[1];
+          const subPath = source.path ? source.path.replace(/^\//, '') : '';
+
+          for (const record of group) {
+            const filePath = subPath ? `${subPath}/${record.file}` : record.file;
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${filePath}`;
+            try {
+              const res = await fetch(rawUrl);
+              if (!res.ok) {
+                console.log(`❌ ${record.file}: HTTP ${res.status}`);
+                errors++;
+                continue;
+              }
+              const content = Buffer.from(await res.arrayBuffer());
+              const destPath = path.join(destination.location, record.file);
+              fs.mkdirSync(path.dirname(destPath), { recursive: true });
+              fs.writeFileSync(destPath, content);
+              if (record.index !== undefined) {
+                fs.mkdirSync(fileCacheDir(dest), { recursive: true });
+                fs.writeFileSync(fileCachePath(dest, record.index), content);
+              }
+              addCopy({ source: sourceName, destination: dest, file: record.file, copiedAt: new Date().toISOString() });
+              console.log(`${chalk.green('✓')} ${record.file}`);
+              copied++;
+            } catch (err) {
+              console.log(`❌ ${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+              errors++;
+            }
+          }
+          continue; // next source group
         }
 
-        let workTree: string;
-        if (source.type === 'git') {
-          const cacheDir = gitCacheDir(sourceName);
-          workTree = source.path !== undefined ? path.join(cacheDir, source.path.replace(/^\//, '')) : cacheDir;
-        } else {
-          workTree = source.location;
-        }
+        // Local source
+        const workTree: string = source.location;
 
         for (const record of group) {
           const srcPath = path.join(workTree, record.file);

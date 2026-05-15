@@ -10,7 +10,7 @@ const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.conf
 const config = new Conf<ScopyConfig>({
   cwd: configDir,
   configName: 'scopy',
-  defaults: { sources: [], destinations: [], repo_pull_ttl_sec: 0, lastPullTimestamps: {} },
+  defaults: { sources: [], destinations: [] },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
@@ -22,21 +22,6 @@ const copiesConfig = new Conf<CopiesConfig>({
   defaults: { copies: [] },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
-
-export function getRepoPullTtlSec(): number {
-  return config.get('repo_pull_ttl_sec');
-}
-
-export function getLastPull(sourceName: string): string | null {
-  const timestamps = config.get('lastPullTimestamps');
-  return timestamps[sourceName] || null;
-}
-
-export function setLastPull(sourceName: string, timestamp: string): void {
-  const timestamps = config.get('lastPullTimestamps');
-  timestamps[sourceName] = timestamp;
-  config.set('lastPullTimestamps', timestamps);
-}
 
 export function getSources(): Source[] {
   return config.get('sources');
