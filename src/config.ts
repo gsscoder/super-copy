@@ -14,7 +14,7 @@ const config = new Conf<ScopyConfig>({
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
-const dataPath = process.env.SCOPY_DATA_DIR ?? envPaths('scopy', { suffix: '' }).data;
+export const dataPath = process.env.SCOPY_DATA_DIR ?? envPaths('scopy', { suffix: '' }).data;
 
 const copiesConfig = new Conf<CopiesConfig>({
   cwd: dataPath,

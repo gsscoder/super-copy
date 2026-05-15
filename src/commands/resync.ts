@@ -63,18 +63,12 @@ async function ensureGitRepo(name: string, url: string): Promise<void> {
   }
 }
 
-interface ResyncOptions {
+export interface ResyncOptions {
   dryRun: boolean;
   unghost: boolean;
 }
 
-export default function registerResync(program: Command): void {
-  program
-    .command('resync <dest>')
-    .description('Re-copy all tracked files to a destination')
-    .option('--dry-run', 'Preview what would be copied without making changes')
-    .option('--unghost', 'Restore ghosted files from cache')
-    .action(async (dest: string, opts: ResyncOptions) => {
+export async function handleResync(dest: string, opts: ResyncOptions): Promise<void> {
       const dryRun = opts.dryRun;
 
       if (!destinationExists(dest)) {
@@ -256,5 +250,13 @@ export default function registerResync(program: Command): void {
       if (errors > 0) {
         process.exitCode = 1;
       }
-    });
+}
+
+export default function registerResync(program: Command): void {
+  program
+    .command('resync <dest>')
+    .description('Re-copy all tracked files to a destination')
+    .option('--dry-run', 'Preview what would be copied without making changes')
+    .option('--unghost', 'Restore ghosted files from cache')
+    .action(handleResync);
 }

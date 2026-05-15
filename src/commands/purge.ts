@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
-import envPaths from 'env-paths';
+
 import { Command } from 'commander';
-import { getCopies, purgeCopies } from '../config.js';
+import { dataPath, getCopies, purgeCopies } from '../config.js';
 import type { CopyRecord } from '../types.js';
 import { dim } from '../ui.js';
 
@@ -16,10 +16,10 @@ interface PurgeLogOptions {
 }
 
 function reposDir(): string {
-  return path.join(envPaths('scopy', { suffix: '' }).data, 'repos');
+  return path.join(dataPath, 'repos');
 }
 
-function handlePurgeRepos(opts: PurgeOptions): void {
+export function handlePurgeRepos(opts: PurgeOptions): void {
   const dir = reposDir();
 
   if (!fs.existsSync(dir)) {
@@ -73,7 +73,7 @@ function applyPurge(predicate: (r: CopyRecord) => boolean, dryRun: boolean): voi
   console.log(`${removed} entr${removed === 1 ? 'y' : 'ies'} removed`);
 }
 
-function handlePurgeLog(dest: string | undefined, opts: PurgeLogOptions): void {
+export function handlePurgeLog(dest: string | undefined, opts: PurgeLogOptions): void {
   if (dest === '*') {
     applyPurge(allPredicate(), opts.dryRun);
     return;
