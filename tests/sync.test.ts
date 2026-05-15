@@ -118,6 +118,24 @@ describe('sync', () => {
     expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 
+  it('filters by multi-wildcard glob (*.zsh*)', async () => {
+    populateSource(dirs.source, {
+      '.zshrc': 'zshrc content',
+      '.zshenv': 'zshenv content',
+      'foo.zsh.bak': 'bak content',
+      'foo.txt': 'txt content',
+      'readme.md': 'md content',
+    });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/*.zsh*', 'test-dst', {});
+
+    const destFiles = fs.readdirSync(dirs.dest);
+    expect(destFiles).toEqual(expect.arrayContaining(['.zshrc', '.zshenv', 'foo.zsh.bak']));
+    expect(destFiles).not.toContain('foo.txt');
+    expect(destFiles).not.toContain('readme.md');
+    expect(destFiles).toHaveLength(3);
+  });
+
   it('errors on unregistered source', async () => {
     const { handleSync } = await import('../src/commands/sync.js');
     await expect(

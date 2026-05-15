@@ -57,6 +57,50 @@ describe('fetchGitHubFiles', () => {
     expect(result.map(f => f.name)).not.toContain('bar.txt');
   });
 
+  it('filters by multi-wildcard glob (*.zsh*)', async () => {
+    const mockEntries = [
+      { type: 'file', name: '.zshrc', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/.zshrc' },
+      { type: 'file', name: '.zshenv', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/.zshenv' },
+      { type: 'file', name: 'foo.zsh.bak', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/foo.zsh.bak' },
+      { type: 'file', name: 'foo.txt', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/foo.txt' },
+      { type: 'file', name: 'readme.md', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/readme.md' },
+    ];
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockEntries,
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    const result = await fetchGitHubFiles('owner', 'repo', '', '*.zsh*');
+
+    expect(result.map(f => f.name)).toEqual(expect.arrayContaining(['.zshrc', '.zshenv', 'foo.zsh.bak']));
+    expect(result.map(f => f.name)).not.toContain('foo.txt');
+    expect(result.map(f => f.name)).not.toContain('readme.md');
+    expect(result).toHaveLength(3);
+  });
+
+  it('handles glob with subdir prefix (subdir/*.zsh*)', async () => {
+    const mockEntries = [
+      { type: 'file', name: '.zshrc', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/subdir/.zshrc' },
+      { type: 'file', name: 'foo.zsh.bak', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/subdir/foo.zsh.bak' },
+      { type: 'file', name: 'foo.txt', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/subdir/foo.txt' },
+    ];
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockEntries,
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    const result = await fetchGitHubFiles('owner', 'repo', '', 'subdir/*.zsh*');
+
+    expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining('subdir'), expect.anything());
+    expect(result.map(f => f.name)).toEqual(expect.arrayContaining(['.zshrc', 'foo.zsh.bak']));
+    expect(result.map(f => f.name)).not.toContain('foo.txt');
+    expect(result).toHaveLength(2);
+  });
+
   it('throws on non-ok GitHub API response', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
