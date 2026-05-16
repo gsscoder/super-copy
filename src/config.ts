@@ -80,14 +80,15 @@ export function getCopies(): CopyRecord[] {
 export function addCopy(record: CopyRecord): void {
   const copies = getCopies();
   const existing = copies.find(
-    (c) => c.source === record.source && c.destination === record.destination && c.file === record.file
+    (c) => c.destination === record.destination && c.file === record.file
   );
   if (existing) {
-    // Upsert: update copiedAt only; never reassign index or ghosted
+    // Upsert: update copiedAt and source; never reassign index or ghosted
+    existing.source = record.source;
     existing.copiedAt = record.copiedAt ?? new Date().toISOString();
     // Migration: assign index if missing
     if (existing.index === undefined) {
-      existing.index = getNextIndex(existing.destination);
+      existing.index = getNextIndex();
     }
     // Migration: default ghosted to false if missing
     if (existing.ghosted === undefined) {
@@ -99,7 +100,7 @@ export function addCopy(record: CopyRecord): void {
       destination: record.destination,
       file: record.file,
       copiedAt: record.copiedAt ?? new Date().toISOString(),
-      index: getNextIndex(record.destination),
+      index: getNextIndex(),
       ghosted: false,
     });
   }
@@ -124,8 +125,8 @@ export function purgeCopies(predicate: (r: CopyRecord) => boolean): number {
   return removed;
 }
 
-export function getNextIndex(destName: string): number {
-  const copies = getCopiesByDestination(destName);
+export function getNextIndex(): number {
+  const copies = getCopies();
   const maxIndex = copies.reduce((max, c) => {
     const idx = c.index ?? 0;
     return idx > max ? idx : max;
