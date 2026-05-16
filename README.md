@@ -12,7 +12,7 @@ Designed for single-user, local workflows: dotfiles, config files, Claude Code a
 npm install -g @koder0x/scopy@next
 ```
 
-> Current version: `0.2.1-rc.1` — stable release coming soon. `@next` installs the current release candidate.
+> Current version: `0.2.5-rc.1` — stable release coming soon. `@next` installs the current release candidate.
 
 ## How it works
 
@@ -31,7 +31,7 @@ Register sources (GitHub repos or local directories) and destinations (local dir
 | `scopy sync <source>[/<glob>] <dest>` | Copy files from source to destination |
 | `scopy resync [dest]` | Re-copy tracked files from their original sources |
 | `scopy log [dest]` | Show copy history |
-| `scopy ghost <dest> <index>` | Soft-remove a tracked file (preserves cache for restore) |
+| `scopy ghost <dest> <selector>` | Toggle tracked file(s) between present and ghosted; selector is an index, filename, or wildcard (e.g. `task-*`, `*`) |
 | `scopy purge log [dest]` | Clear copy log entries |
 | `scopy info` | Show config file location and registered locations |
 
@@ -48,9 +48,11 @@ scopy sync cc-agents/agents/implement/*.md my-project
 # Re-sync after upstream updates
 scopy resync my-project
 
-# Check log to find index, then ghost task-builder.md
+# Check log to find index, then ghost by index, filename, or wildcard
 scopy log my-project
 scopy ghost my-project 6
+scopy ghost my-project task-builder.md
+scopy ghost my-project task-*
 
 # Restore it (same command toggles back)
 scopy ghost my-project 6
@@ -62,4 +64,4 @@ scopy ghost my-project 6
 
 ## License
 
-MIT © [Koder0x](https://github.com/gsscoder)
+MIT © [koder0x](https://github.com/gsscoder)
