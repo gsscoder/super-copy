@@ -36,18 +36,22 @@ Register sources (GitHub repos or local directories) and destinations (local dir
 ## Example
 
 ```sh
-# Register a dotfiles repo and a target directory
-scopy source add dotfiles https://github.com/you/dotfiles
-scopy dest add home ~
+# Register Claude Code agents repo and a project-level destination
+scopy source add cc-agents https://github.com/gsscoder/claude-coding-agents
+scopy dest add my-project /path/to/your/project/.claude/agents
 
-# Copy everything
-scopy sync dotfiles home
+# Sync all implement agents
+scopy sync cc-agents/agents/implement/*.md my-project
 
-# Copy only shell configs
-scopy sync dotfiles/*.zsh* home
+# Re-sync after upstream updates
+scopy resync my-project
 
-# Preview what would be re-synced
-scopy resync home --dry-run
+# Check log to find index, then ghost task-builder.md
+scopy log my-project
+scopy ghost my-project 6
+
+# Restore it (same command toggles back)
+scopy ghost my-project 6
 ```
 
 ## Requirements
