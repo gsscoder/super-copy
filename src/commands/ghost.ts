@@ -47,7 +47,7 @@ export async function handleGhost(dest: string, indexStr: string): Promise<void>
 
     fs.rmSync(destPath, { force: true });
     setGhosted(dest, index, true);
-    console.log(`${chalk.green('ghosted')} ${record.file}`);
+    console.log(`${chalk.red('ghosted')} ${record.file} → removed and cached`);
   } else {
     const cachePath = fileCachePath(dest, index);
     if (!fs.existsSync(cachePath)) {
@@ -64,7 +64,7 @@ export async function handleGhost(dest: string, indexStr: string): Promise<void>
       file: record.file,
       copiedAt: new Date().toISOString(),
     });
-    console.log(`${chalk.green('restored')} ${record.file}`);
+    console.log(`${chalk.green('unghosted')} ${record.file} ← restored from cache`);
   }
 }
 
