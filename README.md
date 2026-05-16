@@ -1,8 +1,10 @@
 # Super Copy
 
-A CLI tool for deploying files from registered sources to registered destinations — with tracking, re-sync, and ghost support.
+A CLI tool for deploying files from registered sources to registered destinations, with tracking, re-sync, and ghost support (remove and restore tracked files).
 
 Designed for single-user, local workflows: dotfiles, config files, Claude Code agents, or any asset you distribute across machines and projects.
+
+![Demo](docs/demo.gif)
 
 ## Install
 
