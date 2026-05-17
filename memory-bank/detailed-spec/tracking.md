@@ -49,9 +49,9 @@ Each row: index, filename, `copiedAt` timestamp, `[ghosted]` tag if file is ghos
 Toggles a tracked file between present and ghosted state by index
 
 ### Command Signature
-`scopy ghost <dest> <file-index>`
+`scopy ghost <dest> <selector>`
 - `dest` (str): registered destination name
-- `file-index` (int): index of the tracked file as shown by `scopy log`
+- `selector`: file index (int), exact filename, or wildcard pattern (e.g. `task-*`)
 
 ### Ghost (active → ghosted)
 Removes the file from the destination directory. Sets `ghosted=true` in the registry. Cache at `fileCachePath(dest, index)` is expected to already exist; warns if missing
@@ -61,7 +61,8 @@ Copies from `fileCachePath(dest, index)` back to the destination directory. Sets
 
 ### Validation
 - Errors if dest not registered
-- Errors if file-index is invalid
+- Errors if selector is an index and no matching record exists
+- Warns (dim) if no files match a filename/wildcard selector
 - Errors if cache file missing on restore
 
 ## Purge
