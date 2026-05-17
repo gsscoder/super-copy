@@ -9,8 +9,8 @@ import { heading, dim, blank, error } from '../ui.js';
 import type { CopyRecord } from '../types.js';
 import chalk from 'chalk';
 
-function printDestGroup(destName: string, records: CopyRecord[]): void {
-  heading(destName);
+function printDestGroup(destName: string, location: string, records: CopyRecord[]): void {
+  heading(`${destName} ${chalk.gray('(' + location + ')')}`);
 
   if (records.length === 0) {
     dim('no tracked files');
@@ -24,7 +24,7 @@ function printDestGroup(destName: string, records: CopyRecord[]): void {
     const idx = String(r.index ?? '?').padStart(indexWidth);
     const name = r.file.padEnd(nameWidth);
     const ts = chalk.dim(r.copiedAt ?? '');
-    const ghosted = r.ghosted ? chalk.dim(' [ghosted]') : '';
+    const ghosted = r.ghosted ? chalk.red(' [ghosted]') : chalk.green(' [unghosted]');
     console.log(`  ${idx}  ${name}  ${ts}${ghosted}`);
   }
 }
@@ -36,7 +36,9 @@ function handleLog(dest: string | undefined): void {
       process.exit(1);
     }
     const copies = getCopiesByDestination(dest);
-    printDestGroup(dest, copies);
+    const destinations = getDestinations();
+    const destObj = destinations.find((d) => d.name === dest);
+    printDestGroup(dest, destObj?.location ?? '', copies);
     return;
   }
 
@@ -54,7 +56,7 @@ function handleLog(dest: string | undefined): void {
   for (let i = 0; i < withFiles.length; i++) {
     const d = withFiles[i];
     const copies = allCopies.filter((c) => c.destination === d.name);
-    printDestGroup(d.name, copies);
+    printDestGroup(d.name, d.location, copies);
     if (i < withFiles.length - 1) blank();
   }
 
