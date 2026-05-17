@@ -28,9 +28,14 @@ export interface CopyRecord {
   ghosted?: boolean
 }
 
+export interface Prefs {
+  'sync.allowOverwrite': boolean
+}
+
 export interface ScopyConfig {
   sources: Source[]
   destinations: Destination[]
+  prefs?: Prefs
 }
 
 export interface CopiesConfig {

@@ -12,6 +12,7 @@ import {
   getCopiesByDestination,
   fileCacheDir,
   fileCachePath,
+  getPref,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 
@@ -144,7 +145,8 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
 }
 
 export async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
-  const { force, dryRun } = options;
+  const { dryRun } = options;
+  const force = (options.force ?? false) || getPref('sync.allowOverwrite');
 
   // Parse source-spec
   const slashIndex = sourceSpec.indexOf('/');
@@ -175,6 +177,10 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
   if (source === undefined || dest === undefined) {
     uiError('internal error: source or destination missing after validation');
     return;
+  }
+
+  if (!force && !dryRun) {
+    console.log(chalk.dim('💡 you can run `scopy config sync.allowOverwrite true` to skip overwrite confirmation'));
   }
 
   if (source.type === 'git') {

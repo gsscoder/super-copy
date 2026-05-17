@@ -2,7 +2,7 @@ import Conf from 'conf';
 import envPaths from 'env-paths';
 import os from 'node:os';
 import path from 'node:path';
-import type { CopiesConfig, CopyRecord, Destination, ScopyConfig, Source } from './types.js';
+import type { CopiesConfig, CopyRecord, Destination, Prefs, ScopyConfig, Source } from './types.js';
 
 // WARNING: concurrent access is not supported — config.get/set sequences are not atomic and parallel processes will cause silent data loss.
 const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'scopy');
@@ -10,7 +10,7 @@ const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.conf
 const config = new Conf<ScopyConfig>({
   cwd: configDir,
   configName: 'scopy',
-  defaults: { sources: [], destinations: [] },
+  defaults: { sources: [], destinations: [], prefs: { 'sync.allowOverwrite': false } },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
@@ -157,4 +157,28 @@ export function fileCacheDir(destName: string): string {
 
 export function fileCachePath(destName: string, index: number): string {
   return path.join(fileCacheDir(destName), String(index));
+}
+
+export const PREF_KEYS = ['sync.allowOverwrite'] as const;
+export type PrefKey = typeof PREF_KEYS[number];
+
+const PREF_DEFAULTS: Prefs = { 'sync.allowOverwrite': false };
+
+export function getPrefs(): Prefs {
+  const stored = config.get('prefs');
+  const merged: Prefs = { ...PREF_DEFAULTS, ...(stored ?? {}) };
+  if (stored === undefined || PREF_KEYS.some((k) => !(k in stored))) {
+    config.set('prefs', merged);
+  }
+  return merged;
+}
+
+export function getPref<K extends PrefKey>(key: K): Prefs[K] {
+  return getPrefs()[key];
+}
+
+export function setPref<K extends PrefKey>(key: K, value: Prefs[K]): void {
+  const prefs = getPrefs();
+  prefs[key] = value;
+  config.set('prefs', prefs);
 }
