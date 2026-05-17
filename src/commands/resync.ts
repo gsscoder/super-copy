@@ -128,7 +128,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
 
           const workTree: string = source.location;
           for (const record of group) {
-            const srcPath = path.join(workTree, record.file);
+            const srcPath = path.join(workTree, record.sourcePath ?? record.file);
             if (!fs.existsSync(srcPath)) {
               console.log(`❌ ${record.file}: file not found in source`);
               continue;
@@ -163,12 +163,25 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
           const owner = urlParts[0];
           const repo = urlParts[1];
           const subPath = source.path ? source.path.replace(/^\//, '') : '';
+          const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
 
           for (const record of group) {
-            const filePath = subPath ? `${subPath}/${record.file}` : record.file;
-            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${filePath}`;
+            const fileRelPath = record.sourcePath ?? record.file;
+            const filePath = subPath ? `${subPath}/${fileRelPath}` : fileRelPath;
             try {
-              const res = await fetch(rawUrl);
+              const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, { headers });
+              if (!metaRes.ok) {
+                console.log(`❌ ${record.file}: HTTP ${metaRes.status}`);
+                errors++;
+                continue;
+              }
+              const meta = await metaRes.json() as Record<string, unknown>;
+              if (typeof meta.download_url !== 'string') {
+                console.log(`❌ ${record.file}: no download_url in API response`);
+                errors++;
+                continue;
+              }
+              const res = await fetch(meta.download_url);
               if (!res.ok) {
                 console.log(`❌ ${record.file}: HTTP ${res.status}`);
                 errors++;
@@ -182,7 +195,8 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
                 fs.mkdirSync(fileCacheDir(dest), { recursive: true });
                 fs.writeFileSync(fileCachePath(dest, record.index), content);
               }
-              addCopy({ source: sourceName, destination: dest, file: record.file, copiedAt: new Date().toISOString() });
+              const resolvedSourcePath = subPath && filePath.startsWith(subPath + '/') ? filePath.slice(subPath.length + 1) : filePath;
+              addCopy({ source: sourceName, destination: dest, file: record.file, sourcePath: resolvedSourcePath, copiedAt: new Date().toISOString() });
               console.log(`${chalk.green('✓')} ${record.file}`);
               copied++;
             } catch (err) {
@@ -197,7 +211,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         const workTree: string = source.location;
 
         for (const record of group) {
-          const srcPath = path.join(workTree, record.file);
+          const srcPath = path.join(workTree, record.sourcePath ?? record.file);
           if (!fs.existsSync(srcPath)) {
             console.log(`❌ ${record.file}: file not found in source`);
             errors++;

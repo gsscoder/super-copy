@@ -182,4 +182,27 @@ describe('sync', () => {
     });
     expect(typeof copies[0].copiedAt).toBe('string');
   });
+
+  it('stores sourcePath when syncing from subdirectory', async () => {
+    populateSource(dirs.source, { 'subdir/a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/subdir', 'test-dst', {});
+
+    const { getCopies } = await import('../src/config.js');
+    const copies = getCopies();
+    expect(copies[0].file).toBe('a.txt');
+    expect(copies[0].sourcePath).toBe('subdir/a.txt');
+  });
+
+  it('stores sourcePath when syncing with subdir glob pattern', async () => {
+    populateSource(dirs.source, { 'subdir/a.md': 'md', 'subdir/b.txt': 'txt' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/subdir/*.md', 'test-dst', {});
+
+    const { getCopies } = await import('../src/config.js');
+    const copies = getCopies();
+    expect(copies).toHaveLength(1);
+    expect(copies[0].file).toBe('a.md');
+    expect(copies[0].sourcePath).toBe('subdir/a.md');
+  });
 });

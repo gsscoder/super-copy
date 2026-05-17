@@ -86,6 +86,9 @@ export function addCopy(record: CopyRecord): void {
     // Upsert: update copiedAt and source; never reassign index or ghosted
     existing.source = record.source;
     existing.copiedAt = record.copiedAt ?? new Date().toISOString();
+    if (record.sourcePath !== undefined) {
+      existing.sourcePath = record.sourcePath;
+    }
     // Migration: assign index if missing
     if (existing.index === undefined) {
       existing.index = getNextIndex();
@@ -99,6 +102,7 @@ export function addCopy(record: CopyRecord): void {
       source: record.source,
       destination: record.destination,
       file: record.file,
+      sourcePath: record.sourcePath,
       copiedAt: record.copiedAt ?? new Date().toISOString(),
       index: getNextIndex(),
       ghosted: false,

@@ -32,6 +32,7 @@ function confirm(msg: string): Promise<boolean> {
 
 interface GitHubFile {
   name: string
+  relativePath: string
   downloadUrl: string
 }
 
@@ -67,7 +68,8 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
   if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
     const obj = data as Record<string, unknown>;
     if (obj.type === 'file' && typeof obj.name === 'string' && typeof obj.download_url === 'string') {
-      return [{ name: fileSpec ?? obj.name as string, downloadUrl: obj.download_url as string }];
+      const name = fileSpec ?? obj.name as string;
+      return [{ name, relativePath: name, downloadUrl: obj.download_url as string }];
     }
     // directory object — shouldn't happen for file spec
     return [];
@@ -82,16 +84,21 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
     entries = entries.filter((e) => typeof e.name === 'string' && regex.test(e.name as string));
   }
 
+  // Compute the subdir prefix so callers can reconstruct the full source-relative path
+  const dirPrefix = globPart !== undefined
+    ? (fileSpec !== undefined ? fileSpec.slice(0, fileSpec.lastIndexOf('/') + 1) : '')
+    : (fileSpec !== undefined ? `${fileSpec}/` : '');
+
   return entries
     .filter((e) => typeof e.name === 'string' && typeof e.download_url === 'string')
-    .map((e) => ({ name: e.name as string, downloadUrl: e.download_url as string }));
+    .map((e) => ({ name: e.name as string, relativePath: `${dirPrefix}${e.name as string}`, downloadUrl: e.download_url as string }));
 }
 
-function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ src: string; rel: string }> {
+function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ src: string; rel: string; sourcePath: string }> {
   if (fileSpec === undefined) {
     return fs.readdirSync(workTree, { withFileTypes: true })
       .filter((e) => e.isFile())
-      .map((e) => ({ src: path.join(workTree, e.name), rel: e.name }));
+      .map((e) => ({ src: path.join(workTree, e.name), rel: e.name, sourcePath: e.name }));
   }
 
   if (fileSpec.includes('*')) {
@@ -115,6 +122,7 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
       .map((e) => ({
         src: path.join(dirPath, e.name),
         rel: e.name,
+        sourcePath: dirPart ? `${dirPart}/${e.name}` : e.name,
       }));
   }
 
@@ -130,9 +138,9 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
   if (fs.statSync(srcPath).isDirectory()) {
     return fs.readdirSync(srcPath, { withFileTypes: true })
       .filter((e) => e.isFile())
-      .map((e) => ({ src: path.join(srcPath, e.name), rel: e.name }));
+      .map((e) => ({ src: path.join(srcPath, e.name), rel: e.name, sourcePath: `${fileSpec}/${e.name}` }));
   }
-  return [{ src: srcPath, rel: fileSpec }];
+  return [{ src: srcPath, rel: fileSpec, sourcePath: fileSpec }];
 }
 
 export async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
@@ -218,7 +226,7 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
         fs.writeFileSync(destPath, content);
 
-        addCopy({ source: sourceName, destination: destName, file: f.name, copiedAt: new Date().toISOString() });
+        addCopy({ source: sourceName, destination: destName, file: f.name, sourcePath: f.relativePath, copiedAt: new Date().toISOString() });
 
         const copies = getCopiesByDestination(destName);
         const record = copies.find((c) => c.source === sourceName && c.file === f.name);
@@ -248,7 +256,7 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
   // Local source
   const workTree = source.location;
 
-  let files: Array<{ src: string; rel: string }>;
+  let files: Array<{ src: string; rel: string; sourcePath: string }>;
   try {
     files = resolveFiles(workTree, fileSpec);
   } catch (err) {
@@ -293,6 +301,7 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
         source: sourceName,
         destination: destName,
         file: f.rel,
+        sourcePath: f.sourcePath,
         copiedAt: new Date().toISOString(),
       });
 

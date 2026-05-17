@@ -22,6 +22,7 @@ export interface CopyRecord {
   source: string
   destination: string
   file: string
+  sourcePath?: string
   copiedAt?: string
   index?: number
   ghosted?: boolean

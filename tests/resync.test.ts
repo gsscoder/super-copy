@@ -24,6 +24,7 @@ describe('resync', () => {
     delete process.env.SCOPY_DATA_DIR;
     cleanup(dirs);
     vi.resetModules();
+    vi.restoreAllMocks();
   });
 
   it('re-copies active files from source', async () => {
@@ -137,6 +138,66 @@ describe('resync', () => {
 
     // copiedAt should be unchanged
     expect(getCopies()[0].copiedAt).toBe(copiedAt);
+  });
+
+  it('re-copies files from git source using sourcePath', async () => {
+    const { addSource, addDestination, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo', path: '/agents' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+    addCopy({ source: 'git-src', destination: 'git-dst', file: 'a.md', sourcePath: 'implement/a.md', copiedAt: new Date().toISOString() });
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('api.github.com')) {
+        return { ok: true, json: async () => ({ type: 'file', name: 'a.md', download_url: 'https://raw.githubusercontent.com/owner/repo/main/agents/implement/a.md' }) } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array(Buffer.from('updated')).buffer } as Response;
+    });
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('git-dst', {});
+
+    expect(fs.existsSync(path.join(dirs.dest, 'a.md'))).toBe(true);
+    expect(fs.readFileSync(path.join(dirs.dest, 'a.md'), 'utf8')).toBe('updated');
+  });
+
+  it('builds Contents API URL from sourcePath, not bare filename', async () => {
+    const { addSource, addDestination, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo', path: '/agents' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+    addCopy({ source: 'git-src', destination: 'git-dst', file: 'a.md', sourcePath: 'implement/a.md', copiedAt: new Date().toISOString() });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('api.github.com')) {
+        return { ok: true, json: async () => ({ type: 'file', name: 'a.md', download_url: 'https://raw.githubusercontent.com/owner/repo/main/agents/implement/a.md' }) } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array(Buffer.from('updated')).buffer } as Response;
+    });
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('git-dst', {});
+
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('agents/implement/a.md'))).toBe(true);
+    expect(urls.every((u) => !u.includes('agents/a.md'))).toBe(true);
+  });
+
+  it('reports HTTP 404 when git file not found', async () => {
+    const { addSource, addDestination, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo', path: '/agents' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+    addCopy({ source: 'git-src', destination: 'git-dst', file: 'missing.md', sourcePath: 'implement/missing.md', copiedAt: new Date().toISOString() });
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return { ok: false, status: 404 } as Response;
+    });
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('git-dst', {});
+
+    expect(process.exitCode).toBe(1);
+    expect(fs.existsSync(path.join(dirs.dest, 'missing.md'))).toBe(false);
   });
 
   it('--unghost restores ghosted files from cache, ignores active files', async () => {
