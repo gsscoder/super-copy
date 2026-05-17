@@ -1,10 +1,22 @@
 import { Command } from 'commander';
+import readline from 'node:readline';
 import { getCopies, purgeCopies } from '../config.js';
 import type { CopyRecord } from '../types.js';
-import { dim } from '../ui.js';
+import { error as uiError, dim } from '../ui.js';
 
 interface PurgeLogOptions {
   dryRun: boolean;
+  force: boolean;
+}
+
+function confirm(msg: string): Promise<boolean> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(msg, (answer: string) => {
+      rl.close();
+      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+    });
+  });
 }
 
 function allPredicate(): (r: CopyRecord) => boolean {
@@ -29,18 +41,28 @@ function applyPurge(predicate: (r: CopyRecord) => boolean, dryRun: boolean): voi
   console.log(`${removed} entr${removed === 1 ? 'y' : 'ies'} removed`);
 }
 
-export function handlePurgeLog(dest: string | undefined, opts: PurgeLogOptions): void {
-  if (dest === '*') {
-    applyPurge(allPredicate(), opts.dryRun);
+export async function handlePurgeLog(dest: string | undefined, opts: PurgeLogOptions): Promise<void> {
+  if (dest === undefined) {
+    uiError('specify a destination name or * for all');
     return;
   }
 
-  if (dest !== undefined) {
-    applyPurge(byDestinationPredicate(dest), opts.dryRun);
-    return;
+  const predicate = dest === '*' ? allPredicate() : byDestinationPredicate(dest);
+
+  if (!opts.dryRun && !opts.force) {
+    const count = getCopies().filter(predicate).length;
+    if (count === 0) {
+      dim('nothing to purge');
+      return;
+    }
+    const ok = await confirm(`Remove ${count} entr${count === 1 ? 'y' : 'ies'}? (y/N) `);
+    if (!ok) {
+      dim('aborted');
+      return;
+    }
   }
 
-  dim('nothing to purge (provide a destination or * for all)');
+  applyPurge(predicate, opts.dryRun);
 }
 
 export default function registerPurge(program: Command): void {
@@ -50,6 +72,7 @@ export default function registerPurge(program: Command): void {
     .command('log [dest]')
     .description('Remove copy log entries by destination (* = all, <name> = named dest) or by age (--older-than)')
     .option('--dry-run', 'Show what would be removed without modifying the registry')
+    .option('--force', 'Skip confirmation prompt')
     .action((dest: string | undefined, opts: PurgeLogOptions) => handlePurgeLog(dest, opts));
 
   program.addCommand(purge);

@@ -63,13 +63,13 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         let errs = 0;
         for (const record of ghostedRecords) {
           if (record.index === undefined) {
-            console.log(`❌ ${record.file}: missing index, cannot restore`);
+            uiError(`${record.file}: missing index, cannot restore`);
             errs++;
             continue;
           }
           const cachePath = fileCachePath(dest, record.index);
           if (!fs.existsSync(cachePath)) {
-            console.log(`❌ ${record.file}: cache not found, cannot restore`);
+            uiError(`${record.file}: cache not found, cannot restore`);
             errs++;
             continue;
           }
@@ -114,7 +114,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
           const source: Source | undefined = sources.find((s) => s.name === sourceName);
           if (source === undefined) {
             for (const record of group) {
-              console.log(`❌ ${record.file}: source "${sourceName}" is no longer registered`);
+              uiError(`${record.file}: source "${sourceName}" is no longer registered`);
             }
             continue;
           }
@@ -130,7 +130,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
           for (const record of group) {
             const srcPath = path.join(workTree, record.sourcePath ?? record.file);
             if (!fs.existsSync(srcPath)) {
-              console.log(`❌ ${record.file}: file not found in source`);
+              uiError(`${record.file}: file not found in source`);
               continue;
             }
             validFiles.push(record.file);
@@ -151,7 +151,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         const source: Source | undefined = sources.find((s) => s.name === sourceName);
         if (source === undefined) {
           for (const record of group) {
-            console.log(`❌ ${record.file}: source "${sourceName}" is no longer registered`);
+            uiError(`${record.file}: source "${sourceName}" is no longer registered`);
             errors++;
           }
           continue;
@@ -171,19 +171,19 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
             try {
               const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, { headers });
               if (!metaRes.ok) {
-                console.log(`❌ ${record.file}: HTTP ${metaRes.status}`);
+                uiError(`${record.file}: HTTP ${metaRes.status}`);
                 errors++;
                 continue;
               }
               const meta = await metaRes.json() as Record<string, unknown>;
               if (typeof meta.download_url !== 'string') {
-                console.log(`❌ ${record.file}: no download_url in API response`);
+                uiError(`${record.file}: no download_url in API response`);
                 errors++;
                 continue;
               }
               const res = await fetch(meta.download_url);
               if (!res.ok) {
-                console.log(`❌ ${record.file}: HTTP ${res.status}`);
+                uiError(`${record.file}: HTTP ${res.status}`);
                 errors++;
                 continue;
               }
@@ -200,7 +200,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
               console.log(`${chalk.green('✓')} ${record.file}`);
               copied++;
             } catch (err) {
-              console.log(`❌ ${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+              uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
               errors++;
             }
           }
@@ -213,7 +213,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         for (const record of group) {
           const srcPath = path.join(workTree, record.sourcePath ?? record.file);
           if (!fs.existsSync(srcPath)) {
-            console.log(`❌ ${record.file}: file not found in source`);
+            uiError(`${record.file}: file not found in source`);
             errors++;
             continue;
           }

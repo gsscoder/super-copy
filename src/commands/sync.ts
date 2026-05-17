@@ -247,7 +247,7 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
       } catch (err) {
         const fileErr = err instanceof Error ? err : new Error(String(err));
         copyErrors.push({ file: f.name, err: fileErr });
-        console.error(`❌ ${f.name}: ${fileErr.message}`);
+        uiError(`${f.name}: ${fileErr.message}`);
       }
     }
 
@@ -324,7 +324,7 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       copyErrors.push({ file: f.rel, err: error });
-      console.error(`❌ ${f.rel}: ${error.message}`);
+      uiError(`${f.rel}: ${error.message}`);
     }
   }
 

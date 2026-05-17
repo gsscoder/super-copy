@@ -12,7 +12,7 @@ Designed for single-user, local workflows: dotfiles, config files, Claude Code a
 npm install -g @koder0x/scopy@next
 ```
 
-> Current version: `0.2.11-rc.1` — stable release coming soon. `@next` installs the current release candidate.
+> Current version: `0.2.12-rc.1` — stable release coming soon. `@next` installs the current release candidate.
 
 ## How it works
 
@@ -32,7 +32,7 @@ Register sources (GitHub repos or local directories) and destinations (local dir
 | `scopy resync [dest]` | Re-copy tracked files from their original sources |
 | `scopy log [dest]` | Show copy history |
 | `scopy ghost <dest> <selector>` | Toggle tracked file(s) between present and ghosted; selector is an index, filename, or wildcard (e.g. `task-*`, `*`) |
-| `scopy purge log [dest]` | Clear copy log entries |
+| `scopy purge log <dest\|*> [--force]` | Clear copy log entries (asks confirmation unless `--force`) |
 | `scopy info` | Show config file location and registered locations |
 
 ## Example
