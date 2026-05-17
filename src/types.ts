@@ -32,10 +32,15 @@ export interface Prefs {
   'sync.allowOverwrite': boolean
 }
 
+export interface AppState {
+  tips: Record<string, boolean>
+}
+
 export interface ScopyConfig {
   sources: Source[]
   destinations: Destination[]
   prefs?: Prefs
+  state?: AppState
 }
 
 export interface CopiesConfig {

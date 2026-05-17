@@ -2,7 +2,7 @@ import Conf from 'conf';
 import envPaths from 'env-paths';
 import os from 'node:os';
 import path from 'node:path';
-import type { CopiesConfig, CopyRecord, Destination, Prefs, ScopyConfig, Source } from './types.js';
+import type { AppState, CopiesConfig, CopyRecord, Destination, Prefs, ScopyConfig, Source } from './types.js';
 
 // WARNING: concurrent access is not supported — config.get/set sequences are not atomic and parallel processes will cause silent data loss.
 const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'scopy');
@@ -10,7 +10,7 @@ const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.conf
 const config = new Conf<ScopyConfig>({
   cwd: configDir,
   configName: 'scopy',
-  defaults: { sources: [], destinations: [], prefs: { 'sync.allowOverwrite': false } },
+  defaults: { sources: [], destinations: [], prefs: { 'sync.allowOverwrite': false }, state: { tips: {} } },
   serialize: (data) => JSON.stringify(data, null, 2),
 });
 
@@ -181,4 +181,14 @@ export function setPref<K extends PrefKey>(key: K, value: Prefs[K]): void {
   const prefs = getPrefs();
   prefs[key] = value;
   config.set('prefs', prefs);
+}
+
+export function dismissTip(key: string): void {
+  const state = config.get('state') ?? { tips: {} };
+  state.tips = { ...state.tips, [key]: true };
+  config.set('state', state);
+}
+
+export function isTipDismissed(key: string): boolean {
+  return (config.get('state')?.tips?.[key]) === true;
 }

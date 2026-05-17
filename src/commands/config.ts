@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import type { Command } from 'commander';
-import { getPrefs, getPref, setPref, PREF_KEYS, type PrefKey } from '../config.js';
+import { getPrefs, getPref, setPref, dismissTip, PREF_KEYS, type PrefKey } from '../config.js';
 import { error as uiError } from '../ui.js';
 
 const PREF_VALUES: Record<PrefKey, readonly string[]> = {
@@ -46,6 +46,9 @@ function handleConfig(key: string | undefined, value: string | undefined): void 
 
   if (typedKey === 'sync.allowOverwrite') {
     setPref(typedKey, parseBoolValue(value));
+    if (value === 'true') {
+      dismissTip('sync.allowOverwrite');
+    }
   }
   console.log(`${key}=${chalk.cyan(value)}`);
 }

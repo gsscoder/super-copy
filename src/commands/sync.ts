@@ -13,6 +13,7 @@ import {
   fileCacheDir,
   fileCachePath,
   getPref,
+  isTipDismissed,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 
@@ -179,7 +180,7 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
     return;
   }
 
-  if (!force && !dryRun) {
+  if (!force && !dryRun && !isTipDismissed('sync.allowOverwrite')) {
     console.log(chalk.dim('💡 you can run `scopy config sync.allowOverwrite true` to skip overwrite confirmation'));
   }
 
