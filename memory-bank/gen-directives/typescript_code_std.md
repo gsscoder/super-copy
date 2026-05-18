@@ -1,4 +1,4 @@
-# TypeScript Code Standards (Frontend)
+# TypeScript Code Standards
 
 - Avoid `any`; use `unknown` for uncertain types and narrow before use
 - Do not use non-null assertion (`!`); handle `null`/`undefined` explicitly

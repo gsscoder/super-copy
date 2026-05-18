@@ -20,20 +20,32 @@ Register sources (GitHub repos or local directories) and destinations (local dir
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `scopy source add <name> <url\|path>` | Register a git repo or local directory as a source |
-| `scopy source remove <name>` | Remove a registered source |
-| `scopy source list` | List registered sources |
-| `scopy dest add <name> <path>` | Register a local directory as a destination |
-| `scopy dest remove <name>` | Remove a registered destination |
-| `scopy dest list` | List registered destinations |
-| `scopy sync <source>[/<glob>] <dest> [--force]` | Copy files from source to destination; existing files trigger an interactive multi-select to choose which to overwrite (skipped with `--force`) |
-| `scopy resync [dest]` | Re-copy tracked files from their original sources |
-| `scopy log [dest]` | Show copy history |
-| `scopy ghost [dest] [selector]` | Toggle tracked file(s) between present and ghosted; no args → interactive grouped view across all destinations; selector is an index, filename, or wildcard (e.g. `task-*`, `*`) |
-| `scopy purge log <dest\|*> [--force]` | Clear copy log entries (asks confirmation unless `--force`) |
-| `scopy info` | Show config file location and registered locations |
+```sh
+# Sources
+scopy source add <name> <url|path>   # register a git repo or local directory
+scopy source remove <name>           # remove a registered source
+scopy source list                    # list registered sources
+
+# Destinations
+scopy dest add <name> <path>         # register a local directory
+scopy dest remove <name>             # remove a registered destination
+scopy dest list                      # list registered destinations
+
+# Sync
+scopy sync <source>[/<glob>] <dest>  # copy files; existing files → interactive overwrite selector
+scopy sync ... --force               # overwrite all without prompting
+scopy resync <dest>                  # re-copy all tracked files from their original sources
+
+# History & state
+scopy log [dest]                     # show copy history grouped by destination
+scopy ghost [dest] [selector]        # toggle file(s) ghosted/present; no args → interactive grouped view
+scopy purge log <dest|*>             # remove log entries (asks confirmation)
+scopy purge log <dest|*> --force     # remove log entries without prompting
+
+# Config & info
+scopy config [key] [value]           # get or set preferences (e.g. sync.allowOverwrite)
+scopy info                           # show config path and registered locations
+```
 
 ## Example
 
