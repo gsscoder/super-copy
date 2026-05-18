@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
 import type { Command } from 'commander';
+import checkbox, { Separator } from '@inquirer/checkbox';
 import {
   destinationExists,
   getDestinations,
@@ -56,7 +57,67 @@ function toggleRecord(dest: string, destLocation: string, record: CopyRecord): v
   }
 }
 
-export async function handleGhost(dest: string, selector: string): Promise<void> {
+async function handleGhostInteractive(): Promise<void> {
+  const destinations = getDestinations();
+  const withFiles = destinations.filter((d) => getCopiesByDestination(d.name).length > 0);
+
+  if (withFiles.length === 0) {
+    dim('no destinations with tracked files');
+    return;
+  }
+
+  // Build choices with Separator headers per destination
+  type ChoiceValue = { dest: string; file: string };
+  const choices: Array<InstanceType<typeof Separator> | { name: string; value: ChoiceValue; checked: boolean }> = [];
+
+  const allRecords: Map<string, { dest: string; location: string; records: CopyRecord[] }> = new Map();
+
+  for (const d of withFiles) {
+    const records = getCopiesByDestination(d.name);
+    allRecords.set(d.name, { dest: d.name, location: d.location, records });
+    choices.push(new Separator(chalk.bold(d.name)));
+    for (const r of records) {
+      choices.push({
+        name: r.file,
+        value: { dest: d.name, file: r.file },
+        checked: r.ghosted === true,
+      });
+    }
+  }
+
+  const chosen = await checkbox({
+    message: 'Toggle ghost state (checked = ghosted)',
+    choices,
+    theme: {
+      icon: {
+        checked: chalk.red('● [ghosted]   '),
+        unchecked: chalk.green('○ [unghosted] '),
+        cursor: '›',
+      },
+      style: { answer: () => '' },
+    },
+  });
+
+  const nowGhosted = new Set(chosen.map((c) => `${c.dest}::${c.file}`));
+
+  for (const { dest, location, records } of allRecords.values()) {
+    for (const record of records) {
+      const key = `${dest}::${record.file}`;
+      const wasGhosted = record.ghosted === true;
+      const shouldBeGhosted = nowGhosted.has(key);
+      if (wasGhosted !== shouldBeGhosted) {
+        toggleRecord(dest, location, record);
+      }
+    }
+  }
+}
+
+export async function handleGhost(dest: string | undefined, selector: string | undefined): Promise<void> {
+  if (dest === undefined || selector === undefined) {
+    await handleGhostInteractive();
+    return;
+  }
+
   if (!destinationExists(dest)) {
     uiError(`destination "${dest}" is not registered`);
     return;
@@ -93,8 +154,8 @@ export async function handleGhost(dest: string, selector: string): Promise<void>
 export default function register(program: Command): void {
   program
     .command('ghost')
-    .description('Toggle tracked file(s) between present and ghosted (cached)')
-    .argument('<dest>', 'Destination name')
-    .argument('<selector>', 'File index, filename, or wildcard pattern (e.g. task-*)')
+    .description('Toggle tracked file(s) between present and ghosted (cached); no args = interactive')
+    .argument('[dest]', 'Destination name')
+    .argument('[selector]', 'File index, filename, or wildcard pattern (e.g. task-*)')
     .action(handleGhost);
 }
