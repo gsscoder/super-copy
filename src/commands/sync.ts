@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import readline from 'node:readline';
 import chalk from 'chalk';
+import checkbox from '@inquirer/checkbox';
 import type { Command } from 'commander';
 import {
   getSources,
@@ -22,14 +22,14 @@ function globPattern(pattern: string): RegExp {
   return new RegExp('^' + escaped + '$');
 }
 
-function confirm(msg: string): Promise<boolean> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(msg, (answer: string) => {
-      rl.close();
-      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
-    });
+async function selectOverwrites(names: string[]): Promise<Set<string>> {
+  if (names.length === 0) return new Set();
+  const chosen = await checkbox({
+    message: 'Select files to overwrite',
+    choices: names.map((n) => ({ name: n, value: n, checked: true })),
+    theme: { style: { answer: () => '' } },
   });
+  return new Set(chosen);
 }
 
 interface GitHubFile {
@@ -216,14 +216,14 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
     let skipped = 0;
     const copyErrors: Array<{ file: string; err: Error }> = [];
 
+    const conflicting = gitFiles.filter((f) => fs.existsSync(path.join(dest.location, f.name))).map((f) => f.name);
+    const toOverwrite = force ? new Set(conflicting) : await selectOverwrites(conflicting);
+
     for (const f of gitFiles) {
       const destPath = path.join(dest.location, f.name);
       const existed = fs.existsSync(destPath);
 
-      if (existed && !force) {
-        const ok = await confirm(`${chalk.dim('overwrite')} ${f.name}? `);
-        if (!ok) { skipped++; continue; }
-      }
+      if (existed && !toOverwrite.has(f.name)) { skipped++; continue; }
 
       try {
         const contentRes = await fetch(f.downloadUrl);
@@ -288,17 +288,14 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
   let skipped = 0;
   const copyErrors: Array<{ file: string; err: Error }> = [];
 
+  const conflicting = files.filter((f) => fs.existsSync(path.join(dest.location, f.rel))).map((f) => f.rel);
+  const toOverwrite = force ? new Set(conflicting) : await selectOverwrites(conflicting);
+
   for (const f of files) {
     const destPath = path.join(dest.location, f.rel);
     const existed = fs.existsSync(destPath);
 
-    if (existed && !force) {
-      const ok = await confirm(`${chalk.dim('overwrite')} ${f.rel}? `);
-      if (!ok) {
-        skipped++;
-        continue;
-      }
-    }
+    if (existed && !toOverwrite.has(f.rel)) { skipped++; continue; }
 
     try {
       fs.mkdirSync(path.dirname(destPath), { recursive: true });

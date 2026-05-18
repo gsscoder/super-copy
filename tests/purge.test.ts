@@ -34,7 +34,7 @@ describe('purge', () => {
 
     // Run purge log *
     const { handlePurgeLog } = await import('../src/commands/purge.js');
-    handlePurgeLog('*', { dryRun: false });
+    await handlePurgeLog('*', { dryRun: false, force: true });
 
     // Assert all entries removed
     const { getCopies } = await import('../src/config.js');
@@ -50,7 +50,7 @@ describe('purge', () => {
 
     // Run purge log test-dst
     const { handlePurgeLog } = await import('../src/commands/purge.js');
-    handlePurgeLog('test-dst', { dryRun: false });
+    await handlePurgeLog('test-dst', { dryRun: false, force: true });
 
     // Assert test-dst entries gone, test-dst2 entries intact
     const { getCopies } = await import('../src/config.js');
@@ -67,7 +67,7 @@ describe('purge', () => {
 
     // Run purge log * --dry-run
     const { handlePurgeLog } = await import('../src/commands/purge.js');
-    handlePurgeLog('*', { dryRun: true });
+    await handlePurgeLog('*', { dryRun: true, force: false });
 
     // Assert entry still present
     const { getCopies } = await import('../src/config.js');
@@ -81,7 +81,7 @@ describe('purge', () => {
 
     // Run purge log with no dest
     const { handlePurgeLog } = await import('../src/commands/purge.js');
-    handlePurgeLog(undefined, { dryRun: false });
+    await handlePurgeLog(undefined, { dryRun: false, force: false });
 
     // Assert entry still present
     const { getCopies } = await import('../src/config.js');
