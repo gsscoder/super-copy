@@ -1,6 +1,6 @@
 {
   "name": "@koder0x/scopy",
-  "version": "0.2.12-rc.1",
+  "version": "0.2.19-rc.2",
   "description": "Tool for deploying assets from registered sources to destinations",
   "type": "module",
   "main": "./dist/index.js",

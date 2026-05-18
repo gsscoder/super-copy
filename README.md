@@ -12,7 +12,7 @@ Designed for single-user, local workflows: dotfiles, config files, Claude Code a
 npm install -g @koder0x/scopy@next
 ```
 
-> Current version: `0.2.12-rc.1` — stable release coming soon. `@next` installs the current release candidate.
+> Current version: `0.2.19-rc.2` — stable release coming soon. `@next` installs the current release candidate.
 
 ## How it works
 
@@ -28,10 +28,10 @@ Register sources (GitHub repos or local directories) and destinations (local dir
 | `scopy dest add <name> <path>` | Register a local directory as a destination |
 | `scopy dest remove <name>` | Remove a registered destination |
 | `scopy dest list` | List registered destinations |
-| `scopy sync <source>[/<glob>] <dest>` | Copy files from source to destination |
+| `scopy sync <source>[/<glob>] <dest> [--force]` | Copy files from source to destination; existing files trigger an interactive multi-select to choose which to overwrite (skipped with `--force`) |
 | `scopy resync [dest]` | Re-copy tracked files from their original sources |
 | `scopy log [dest]` | Show copy history |
-| `scopy ghost <dest> <selector>` | Toggle tracked file(s) between present and ghosted; selector is an index, filename, or wildcard (e.g. `task-*`, `*`) |
+| `scopy ghost [dest] [selector]` | Toggle tracked file(s) between present and ghosted; no args → interactive grouped view across all destinations; selector is an index, filename, or wildcard (e.g. `task-*`, `*`) |
 | `scopy purge log <dest\|*> [--force]` | Clear copy log entries (asks confirmation unless `--force`) |
 | `scopy info` | Show config file location and registered locations |
 
@@ -54,8 +54,8 @@ scopy ghost my-project 6
 scopy ghost my-project task-builder.md
 scopy ghost my-project task-*
 
-# Restore it (same command toggles back)
-scopy ghost my-project 6
+# Or use interactive mode — all destinations and files in one grouped view
+scopy ghost
 ```
 
 ## Requirements
