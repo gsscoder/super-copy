@@ -86,7 +86,7 @@ async function handleGhostInteractive(): Promise<void> {
   }
 
   const chosen = await checkbox({
-    message: 'Toggle ghost state (checked = ghosted)',
+    message: '',
     choices,
     theme: {
       icon: {
@@ -94,7 +94,8 @@ async function handleGhostInteractive(): Promise<void> {
         unchecked: chalk.green('○ [unghosted] '),
         cursor: '›',
       },
-      style: { answer: () => '' },
+      prefix: { idle: '', done: '' },
+      style: { answer: () => '', message: () => '' },
     },
   });
 
