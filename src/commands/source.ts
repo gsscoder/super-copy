@@ -74,12 +74,11 @@ function handleList(): void {
     dim('No sources registered');
     return;
   }
-  blank();
+  const w = Math.max(...sources.map((s) => s.name.length)) + 2;
   for (const s of sources) {
     const loc = s.type === 'git' && s.path ? `${s.location} [path: ${s.path}]` : s.location;
-    listItem(s.name, loc);
+    listItem(s.name, loc, w);
   }
-  blank();
 }
 
 export default function register(program: Command): void {

@@ -35,11 +35,10 @@ function handleList(): void {
     dim('No destinations registered');
     return;
   }
-  blank();
+  const w = Math.max(...destinations.map((d) => d.name.length)) + 2;
   for (const d of destinations) {
-    listItem(d.name, d.location);
+    listItem(d.name, d.location, w);
   }
-  blank();
 }
 
 export default function register(program: Command): void {
