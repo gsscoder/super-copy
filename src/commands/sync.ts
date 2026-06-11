@@ -16,11 +16,7 @@ import {
   isTipDismissed,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
-
-function globPattern(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp('^' + escaped + '$');
-}
+import { globPattern } from '../glob.js';
 
 async function selectOverwrites(names: string[]): Promise<Set<string>> {
   if (names.length === 0) return new Set();

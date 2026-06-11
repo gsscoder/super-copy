@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Command } from 'commander';
 import { getSources, addSource, removeSource, sourceExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
-import { listItem, success, error, dim, blank } from '../ui.js';
+import { success, error, dim, blank, printSourceList } from '../ui.js';
 
 interface ParsedGitLocation {
   type: 'git'
@@ -74,11 +74,7 @@ function handleList(): void {
     dim('No sources registered');
     return;
   }
-  const w = Math.max(...sources.map((s) => s.name.length)) + 2;
-  for (const s of sources) {
-    const loc = s.type === 'git' && s.path ? `${s.location} [path: ${s.path}]` : s.location;
-    listItem(s.name, loc, w);
-  }
+  printSourceList(sources);
 }
 
 export default function register(program: Command): void {

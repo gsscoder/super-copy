@@ -1,25 +1,15 @@
-import os from 'node:os';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import chalk from 'chalk';
 import figlet from 'figlet';
-import envPaths from 'env-paths';
 import type { Command } from 'commander';
-import { isPackageJson } from '../types.js';
+import type { PackageJson } from '../types.js';
+import { configDir, dataPath } from '../config.js';
 import { keyValue } from '../ui.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const _raw: unknown = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package.json'), { encoding: 'utf8' }));
-if (!isPackageJson(_raw)) throw new Error('Invalid package.json shape');
-const pkg = _raw;
-
-function handleInfo(): void {
-  const configDir = path.join(os.homedir(), '.config', 'scopy');
+function handleInfo(pkg: PackageJson): void {
   const configPath = path.join(configDir, 'scopy.json');
-  const repoPath = path.join(envPaths('scopy', { suffix: '' }).data, 'repos');
-  const registerPath = path.join(envPaths('scopy', { suffix: '' }).data, 'scopy-register.json');
+  const repoPath = path.join(dataPath, 'repos');
+  const registerPath = path.join(dataPath, 'scopy-register.json');
 
   console.log(chalk.cyan(figlet.textSync('scopy', { font: 'Small Slant' }).replace(/^\n+/, '\n')));
   console.log();
@@ -29,9 +19,9 @@ function handleInfo(): void {
   keyValue('register', registerPath);
 }
 
-export default function register(program: Command): void {
+export default function register(program: Command, pkg: PackageJson): void {
   program
     .command('info')
     .description('Display configuration and environment information')
-    .action(handleInfo);
+    .action(() => handleInfo(pkg));
 }

@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Command } from 'commander';
 import { getDestinations, addDestination, removeDestination, destinationExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
-import { listItem, success, error, dim, blank } from '../ui.js';
+import { success, error, dim, blank, printDestinationList } from '../ui.js';
 
 function handleAdd(name: string, location: string): void {
   if (destinationExists(name)) {
@@ -35,10 +35,7 @@ function handleList(): void {
     dim('No destinations registered');
     return;
   }
-  const w = Math.max(...destinations.map((d) => d.name.length)) + 2;
-  for (const d of destinations) {
-    listItem(d.name, d.location, w);
-  }
+  printDestinationList(destinations);
 }
 
 export default function register(program: Command): void {

@@ -13,12 +13,8 @@ import {
   addCopy,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
+import { globPattern } from '../glob.js';
 import type { CopyRecord } from '../types.js';
-
-function globPattern(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp('^' + escaped + '$');
-}
 
 function toggleRecord(dest: string, destLocation: string, record: CopyRecord): void {
   if (record.index === undefined) {

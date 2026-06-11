@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { AppState, CopiesConfig, CopyRecord, Destination, Prefs, ScopyConfig, Source } from './types.js';
 
 // WARNING: concurrent access is not supported — config.get/set sequences are not atomic and parallel processes will cause silent data loss.
-const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'scopy');
+export const configDir = process.env.SCOPY_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'scopy');
 
 const config = new Conf<ScopyConfig>({
   cwd: configDir,

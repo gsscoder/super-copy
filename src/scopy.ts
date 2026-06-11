@@ -29,7 +29,7 @@ program
 registerSource(program);
 registerDest(program);
 registerSync(program);
-registerInfo(program);
+registerInfo(program, pkg);
 registerList(program);
 registerResync(program);
 registerLog(program);
