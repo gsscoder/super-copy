@@ -9,10 +9,8 @@ Designed for single-user, local workflows: dotfiles, config files, Claude Code a
 ## Install
 
 ```sh
-npm install -g @koder0x/scopy@next
+npm install -g @koder0x/scopy
 ```
-
-> Current version: `0.2.23-rc.2` — stable release coming soon. `@next` installs the current release candidate.
 
 ## How it works
 
