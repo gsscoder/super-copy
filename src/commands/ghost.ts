@@ -53,12 +53,14 @@ function toggleRecord(dest: string, destLocation: string, record: CopyRecord): v
   }
 }
 
-async function handleGhostInteractive(): Promise<void> {
-  const destinations = getDestinations();
+async function handleGhostInteractive(destFilter?: string): Promise<void> {
+  const destinations = destFilter === undefined
+    ? getDestinations()
+    : getDestinations().filter((d) => d.name === destFilter);
   const withFiles = destinations.filter((d) => getCopiesByDestination(d.name).length > 0);
 
   if (withFiles.length === 0) {
-    dim('no destinations with tracked files');
+    dim(destFilter === undefined ? 'no destinations with tracked files' : `no tracked files for destination "${destFilter}"`);
     return;
   }
 
@@ -110,13 +112,18 @@ async function handleGhostInteractive(): Promise<void> {
 }
 
 export async function handleGhost(dest: string | undefined, selector: string | undefined): Promise<void> {
-  if (dest === undefined || selector === undefined) {
+  if (dest === undefined) {
     await handleGhostInteractive();
     return;
   }
 
   if (!destinationExists(dest)) {
     uiError(`destination "${dest}" is not registered`);
+    return;
+  }
+
+  if (selector === undefined) {
+    await handleGhostInteractive(dest);
     return;
   }
 

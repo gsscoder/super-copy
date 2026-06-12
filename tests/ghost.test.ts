@@ -191,4 +191,35 @@ describe('ghost', () => {
     expect(fs.existsSync(destFile)).toBe(true);
     expect(getCopies()[0].ghosted).toBe(false);
   });
+
+  it('errors on unregistered destination when no selector given (does not enter interactive mode)', async () => {
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', {});
+
+    const { handleGhost } = await import('../src/commands/ghost.js');
+
+    await expect(
+      handleGhost('no-such-dest', undefined),
+    ).resolves.toBeUndefined();
+  });
+
+  it('ghost <dest> with no selector only considers that destination, not others', async () => {
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+
+    const { addDestination } = await import('../src/config.js');
+    const dest2 = path.join(path.dirname(dirs.dest), 'dest2');
+    fs.mkdirSync(dest2, { recursive: true });
+    addDestination({ name: 'test-dst-2', location: dest2 });
+
+    // only test-dst-2 gets a tracked file; test-dst has none
+    await handleSync('test-src', 'test-dst-2', {});
+
+    const { handleGhost } = await import('../src/commands/ghost.js');
+
+    await expect(
+      handleGhost('test-dst', undefined),
+    ).resolves.toBeUndefined();
+  });
 });
