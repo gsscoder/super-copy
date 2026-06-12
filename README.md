@@ -1,15 +1,52 @@
 # Super Copy
 
+[![npm version](https://img.shields.io/npm/v/@koder0x/scopy)](https://www.npmjs.com/package/@koder0x/scopy)
+[![license](https://img.shields.io/npm/l/@koder0x/scopy)](LICENSE)
+[![node](https://img.shields.io/node/v/@koder0x/scopy)](package.json)
+
 A CLI tool for deploying files from registered sources to registered destinations, with tracking, re-sync, and ghost support (remove and restore tracked files).
 
 Designed for single-user, local workflows: dotfiles, config files, Claude Code agents, or any asset you distribute across machines and projects.
 
 ![Demo](docs/demo.gif)
 
+## Why?
+
+I maintain a set of [Claude Code agent definitions](https://github.com/gsscoder/claude-coding-agents) and reuse them across many projects — but every agent loaded eats context tokens, even when unused. I needed a way to make agents appear and disappear on demand without losing them. That's **ghost/unghost**: remove a tracked file (cached) when you don't need it, restore it instantly when you do.
+
 ## Install
 
 ```sh
 npm install -g @koder0x/scopy
+```
+
+## Quickstart
+
+```sh
+# Register Claude Code agents repo and a project-level destination
+scopy source add cc-agents https://github.com/gsscoder/claude-coding-agents
+scopy dest add my-project /path/to/your/project/.claude/agents
+
+# Sync all implement agents
+scopy sync cc-agents/agents/implement/*.md my-project
+
+# Re-sync after upstream updates
+scopy resync my-project
+```
+
+## Ghost: make files disappear (and reappear)
+
+Loaded agents you're not using right now still cost context tokens. `ghost` removes a tracked file from its destination (caching it first), `unghost` restores it — same command, toggled.
+
+```sh
+# Find a file's index, then ghost by index, filename, or wildcard
+scopy log my-project
+scopy ghost my-project 6
+scopy ghost my-project task-builder.md
+scopy ghost my-project task-*
+
+# Or go interactive — all destinations and files in one grouped view
+scopy ghost
 ```
 
 ## How it works
@@ -43,29 +80,6 @@ scopy purge log <dest|*> --force     # remove log entries without prompting
 # Config & info
 scopy config [key] [value]           # get or set preferences (e.g. sync.allowOverwrite)
 scopy info                           # show config path and registered locations
-```
-
-## Example
-
-```sh
-# Register Claude Code agents repo and a project-level destination
-scopy source add cc-agents https://github.com/gsscoder/claude-coding-agents
-scopy dest add my-project /path/to/your/project/.claude/agents
-
-# Sync all implement agents
-scopy sync cc-agents/agents/implement/*.md my-project
-
-# Re-sync after upstream updates
-scopy resync my-project
-
-# Check log to find index, then ghost by index, filename, or wildcard
-scopy log my-project
-scopy ghost my-project 6
-scopy ghost my-project task-builder.md
-scopy ghost my-project task-*
-
-# Or use interactive mode — all destinations and files in one grouped view
-scopy ghost
 ```
 
 ## Requirements
