@@ -86,6 +86,7 @@ async function handleGhostInteractive(destFilter?: string): Promise<void> {
   const chosen = await checkbox({
     message: '',
     choices,
+    loop: false,
     theme: {
       icon: {
         checked: chalk.red('● [ghosted]   '),
