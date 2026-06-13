@@ -1,5 +1,5 @@
 {
-  "name": "@koder0x/scopy",
+  "name": "@koder-0x/scopy",
   "version": "1.0.0",
   "description": "Tool for deploying assets from registered sources to destinations",
   "type": "module",
