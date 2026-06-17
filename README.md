@@ -24,11 +24,11 @@ npm install -g @koder-0x/scopy
 
 ```sh
 # Register Claude Code agents repo and a project-level destination
-scopy source add cc-agents https://github.com/gsscoder/claude-coding-agents
+scopy source add cc-agents https://github.com/gsscoder/claude-coding-agents/agents
 scopy dest add my-project /path/to/your/project/.claude/agents
 
 # Sync all implement agents
-scopy sync cc-agents/agents/implement/*.md my-project
+scopy sync cc-agents/implement/*.md my-project
 
 # Re-sync after upstream updates
 scopy resync my-project
