@@ -205,4 +205,51 @@ describe('sync', () => {
     expect(copies[0].file).toBe('a.md');
     expect(copies[0].sourcePath).toBe('subdir/a.md');
   });
+
+  it('recursively syncs **/*.md flattened to dest root', async () => {
+    populateSource(dirs.source, {
+      'root.md': 'root',
+      'implement/a.md': 'impl',
+      'implement/nested/b.md': 'nested',
+      'implement/c.txt': 'txt',
+    });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/**/*.md', 'test-dst', {});
+
+    const destFiles = fs.readdirSync(dirs.dest);
+    expect(destFiles).toEqual(expect.arrayContaining(['root.md', 'a.md', 'b.md']));
+    expect(destFiles).not.toContain('c.txt');
+    expect(destFiles).toHaveLength(3);
+    expect(fs.existsSync(path.join(dirs.dest, 'implement'))).toBe(false);
+  });
+
+  it('recursively syncs ** flattened to dest root', async () => {
+    populateSource(dirs.source, {
+      'root.txt': 'root',
+      'nested/a.txt': 'nested',
+    });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/**', 'test-dst', {});
+
+    const destFiles = fs.readdirSync(dirs.dest);
+    expect(destFiles).toEqual(expect.arrayContaining(['root.txt', 'a.txt']));
+    expect(destFiles).toHaveLength(2);
+  });
+
+  it('aborts ** sync on basename collision without copying', async () => {
+    populateSource(dirs.source, {
+      'foo/a.md': 'one',
+      'bar/a.md': 'two',
+    });
+    fs.mkdirSync(dirs.dest, { recursive: true });
+    fs.writeFileSync(path.join(dirs.dest, 'existing.txt'), 'keep');
+
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src/**/*.md', 'test-dst', {});
+
+    expect(fs.readdirSync(dirs.dest)).toEqual(['existing.txt']);
+
+    const { getCopies } = await import('../src/config.js');
+    expect(getCopies()).toHaveLength(0);
+  });
 });

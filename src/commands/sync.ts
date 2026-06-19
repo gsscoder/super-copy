@@ -16,7 +16,12 @@ import {
   isTipDismissed,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
-import { globPattern } from '../glob.js';
+import {
+  assertNoFlattenCollisions,
+  globPattern,
+  hasGlobstar,
+  matchGlobstar,
+} from '../glob.js';
 
 async function selectOverwrites(names: string[]): Promise<Set<string>> {
   if (names.length === 0) return new Set();
@@ -34,7 +39,87 @@ interface GitHubFile {
   downloadUrl: string
 }
 
+interface GitHubTreeEntry {
+  path: string
+  type: string
+}
+
+function isGitHubTreeEntry(v: unknown): v is GitHubTreeEntry {
+  return (
+    typeof v === 'object' && v !== null &&
+    'path' in v && typeof (v as Record<string, unknown>).path === 'string' &&
+    'type' in v && typeof (v as Record<string, unknown>).type === 'string'
+  );
+}
+
+function isGitHubTreeResponse(v: unknown): v is { tree: unknown[]; truncated?: boolean } {
+  return typeof v === 'object' && v !== null && 'tree' in v && Array.isArray((v as Record<string, unknown>).tree);
+}
+
+async function fetchGitHubTree(owner: string, repo: string): Promise<GitHubTreeEntry[]> {
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`;
+  const res = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
+  if (!res.ok) {
+    throw new Error(`GitHub API error ${res.status} for ${apiUrl}`);
+  }
+  const data: unknown = await res.json();
+  if (!isGitHubTreeResponse(data)) {
+    throw new Error('unexpected GitHub tree API response');
+  }
+  if (data.truncated === true) {
+    throw new Error('repository tree too large — narrow your query');
+  }
+  return data.tree.filter(isGitHubTreeEntry);
+}
+
+function repoRelativePath(subPath: string, workTreePath: string): string {
+  const base = subPath ? subPath.replace(/^\//, '') : '';
+  return base ? `${base}/${workTreePath}` : workTreePath;
+}
+
+async function fetchGitHubFilesRecursive(
+  owner: string,
+  repo: string,
+  subPath: string,
+  fileSpec: string,
+): Promise<GitHubFile[]> {
+  const dirPath = subPath ? subPath.replace(/^\//, '') : '';
+  const prefix = dirPath ? `${dirPath}/` : '';
+
+  const tree = await fetchGitHubTree(owner, repo);
+  const blobs = tree.filter((e) => e.type === 'blob');
+
+  const matched = blobs
+    .filter((e) => {
+      const workTreePath = prefix && e.path.startsWith(prefix)
+        ? e.path.slice(prefix.length)
+        : dirPath === '' ? e.path : null;
+      if (workTreePath === null || workTreePath === '') {
+        return false;
+      }
+      return matchGlobstar(fileSpec, workTreePath);
+    })
+    .map((e) => {
+      const workTreePath = prefix ? e.path.slice(prefix.length) : e.path;
+      const slash = workTreePath.lastIndexOf('/');
+      const name = slash === -1 ? workTreePath : workTreePath.slice(slash + 1);
+      const repoPath = repoRelativePath(subPath, workTreePath);
+      return {
+        name,
+        relativePath: workTreePath,
+        downloadUrl: `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${repoPath}`,
+      };
+    });
+
+  assertNoFlattenCollisions(matched.map((f) => ({ name: f.name, sourcePath: f.relativePath })));
+  return matched;
+}
+
 export async function fetchGitHubFiles(owner: string, repo: string, subPath: string, fileSpec: string | undefined): Promise<GitHubFile[]> {
+  if (fileSpec !== undefined && hasGlobstar(fileSpec)) {
+    return fetchGitHubFilesRecursive(owner, repo, subPath, fileSpec);
+  }
+
   const dirPath = subPath ? subPath.replace(/^\//, '') : '';
 
   let listPath: string;
@@ -92,11 +177,55 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
     .map((e) => ({ name: e.name as string, relativePath: `${dirPrefix}${e.name as string}`, downloadUrl: e.download_url as string }));
 }
 
+function walkRelativeFiles(dir: string, base: string, acc: string[]): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    const rel = path.relative(base, full).split(path.sep).join('/');
+    if (entry.isDirectory()) {
+      walkRelativeFiles(full, base, acc);
+    } else if (entry.isFile()) {
+      acc.push(rel);
+    }
+  }
+}
+
+function resolveFilesRecursive(
+  workTree: string,
+  fileSpec: string,
+): Array<{ src: string; rel: string; sourcePath: string }> {
+  const baseRes = path.resolve(workTree);
+  const relativePaths: string[] = [];
+  walkRelativeFiles(workTree, workTree, relativePaths);
+
+  const matchedPaths = relativePaths.filter((rel) => matchGlobstar(fileSpec, rel));
+
+  assertNoFlattenCollisions(matchedPaths.map((rel) => {
+    const slash = rel.lastIndexOf('/');
+    const name = slash === -1 ? rel : rel.slice(slash + 1);
+    return { name, sourcePath: rel };
+  }));
+
+  return matchedPaths.map((rel) => {
+    const slash = rel.lastIndexOf('/');
+    const name = slash === -1 ? rel : rel.slice(slash + 1);
+    const src = path.join(workTree, ...rel.split('/'));
+    const resolvedSrc = path.resolve(src);
+    if (!resolvedSrc.startsWith(baseRes + path.sep) && resolvedSrc !== baseRes) {
+      throw new Error(`fileSpec escapes base directory: ${fileSpec}`);
+    }
+    return { src, rel: name, sourcePath: rel };
+  });
+}
+
 function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ src: string; rel: string; sourcePath: string }> {
   if (fileSpec === undefined) {
     return fs.readdirSync(workTree, { withFileTypes: true })
       .filter((e) => e.isFile())
       .map((e) => ({ src: path.join(workTree, e.name), rel: e.name, sourcePath: e.name }));
+  }
+
+  if (hasGlobstar(fileSpec)) {
+    return resolveFilesRecursive(workTree, fileSpec);
   }
 
   if (fileSpec.includes('*')) {

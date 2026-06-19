@@ -1,6 +1,6 @@
 # Super Copy
 
-[![npm version](https://img.shields.io/npm/v/@koder-0x/scopy)](https://www.npmjs.com/package/@koder-0x/scopy)
+[![npm version](https://img.shields.io/badge/npm-1.0.3-blue)](https://www.npmjs.com/package/@koder-0x/scopy/v/1.0.3)
 [![license](https://img.shields.io/npm/l/@koder-0x/scopy)](LICENSE)
 [![node](https://img.shields.io/node/v/@koder-0x/scopy)](package.json)
 
@@ -27,8 +27,11 @@ npm install -g @koder-0x/scopy
 scopy source add cc-agents https://github.com/gsscoder/claude-coding-agents/agents
 scopy dest add my-project /path/to/your/project/.claude/agents
 
-# Sync all implement agents
+# Sync agents in one subdirectory
 scopy sync cc-agents/implement/*.md my-project
+
+# Or recursively from nested dirs — flattened to dest root (quote on shells that expand **)
+scopy sync 'cc-agents/**/*.md' my-project
 
 # Re-sync after upstream updates
 scopy resync my-project
@@ -51,7 +54,7 @@ scopy ghost
 
 ## How it works
 
-Register sources (GitHub repos or local directories) and destinations (local directories), then sync files between them. GitHub sources are fetched directly via the GitHub API — no local Git installation required. Every copy is tracked so you can re-sync, inspect history, or ghost files without losing the originals.
+Register sources (GitHub repos or local directories) and destinations (local directories), then sync files between them. GitHub sources are fetched directly via the GitHub API — no local Git installation required. Glob patterns use `*` for a single directory level and `**` for recursive matching; nested files are copied flat (basename only). Sync aborts if a query would flatten two source files to the same name — narrow the pattern or rename files in the source. Every copy is tracked so you can re-sync, inspect history, or ghost files without losing the originals.
 
 ## Commands
 
@@ -68,6 +71,7 @@ scopy dest list                      # list registered destinations
 
 # Sync
 scopy sync <source>[/<glob>] <dest>  # copy files; existing files → interactive overwrite selector
+scopy sync <source>/**/*.md <dest>   # recursive globstar; nested files flattened to dest root
 scopy sync ... --force               # overwrite all without prompting
 scopy resync <dest>                  # re-copy all tracked files from their original sources
 

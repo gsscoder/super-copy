@@ -110,4 +110,51 @@ describe('fetchGitHubFiles', () => {
     const { fetchGitHubFiles } = await import('../src/commands/sync.js');
     await expect(fetchGitHubFiles('owner', 'repo', '', undefined)).rejects.toThrow('404');
   });
+
+  it('recursively fetches **/*.md via git trees API', async () => {
+    const mockTree = {
+      tree: [
+        { path: 'root.md', type: 'blob' },
+        { path: 'implement/a.md', type: 'blob' },
+        { path: 'implement/b.txt', type: 'blob' },
+        { path: 'implement/nested/c.md', type: 'blob' },
+      ],
+      truncated: false,
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockTree,
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    const result = await fetchGitHubFiles('owner', 'repo', '', '**/*.md');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/git/trees/HEAD?recursive=1'),
+      expect.anything(),
+    );
+    expect(result.map((f) => f.name)).toEqual(expect.arrayContaining(['root.md', 'a.md', 'c.md']));
+    expect(result.map((f) => f.name)).not.toContain('b.txt');
+    expect(result).toHaveLength(3);
+    expect(result.find((f) => f.name === 'c.md')?.relativePath).toBe('implement/nested/c.md');
+  });
+
+  it('aborts ** git fetch on basename collision', async () => {
+    const mockTree = {
+      tree: [
+        { path: 'foo/a.md', type: 'blob' },
+        { path: 'bar/a.md', type: 'blob' },
+      ],
+      truncated: false,
+    };
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockTree,
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    await expect(fetchGitHubFiles('owner', 'repo', '', '**/*.md')).rejects.toThrow(/flattening collision/);
+  });
 });
