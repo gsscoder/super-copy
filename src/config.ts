@@ -162,6 +162,10 @@ export function fileCachePath(destName: string, index: number): string {
 export const PREF_KEYS = ['sync.allowOverwrite'] as const;
 export type PrefKey = typeof PREF_KEYS[number];
 
+export function isPrefKey(key: string): key is PrefKey {
+  return PREF_KEYS.includes(key as PrefKey);
+}
+
 const PREF_DEFAULTS: Prefs = { 'sync.allowOverwrite': false };
 
 export function getPrefs(): Prefs {

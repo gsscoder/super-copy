@@ -54,10 +54,9 @@ export interface PackageJson {
 }
 
 export function isPackageJson(v: unknown): v is PackageJson {
-  return (
-    typeof v === 'object' && v !== null &&
-    'name' in v && typeof (v as Record<string, unknown>).name === 'string' &&
-    'description' in v && typeof (v as Record<string, unknown>).description === 'string' &&
-    'version' in v && typeof (v as Record<string, unknown>).version === 'string'
-  )
+  if (typeof v !== 'object' || v === null) return false
+  if (!('name' in v) || typeof v.name !== 'string') return false
+  if (!('description' in v) || typeof v.description !== 'string') return false
+  if (!('version' in v) || typeof v.version !== 'string') return false
+  return true
 }

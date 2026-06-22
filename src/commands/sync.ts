@@ -44,16 +44,31 @@ interface GitHubTreeEntry {
   type: string
 }
 
+interface GitHubContentsEntry {
+  type: string
+  name: string
+  download_url: string
+}
+
+function isGitHubContentsEntry(v: unknown): v is GitHubContentsEntry {
+  if (typeof v !== 'object' || v === null) return false;
+  if (!('type' in v) || typeof v.type !== 'string') return false;
+  if (!('name' in v) || typeof v.name !== 'string') return false;
+  if (!('download_url' in v) || typeof v.download_url !== 'string') return false;
+  return true;
+}
+
 function isGitHubTreeEntry(v: unknown): v is GitHubTreeEntry {
-  return (
-    typeof v === 'object' && v !== null &&
-    'path' in v && typeof (v as Record<string, unknown>).path === 'string' &&
-    'type' in v && typeof (v as Record<string, unknown>).type === 'string'
-  );
+  if (typeof v !== 'object' || v === null) return false;
+  if (!('path' in v) || typeof v.path !== 'string') return false;
+  if (!('type' in v) || typeof v.type !== 'string') return false;
+  return true;
 }
 
 function isGitHubTreeResponse(v: unknown): v is { tree: unknown[]; truncated?: boolean } {
-  return typeof v === 'object' && v !== null && 'tree' in v && Array.isArray((v as Record<string, unknown>).tree);
+  if (typeof v !== 'object' || v === null) return false;
+  if (!('tree' in v) || !Array.isArray(v.tree)) return false;
+  return true;
 }
 
 async function fetchGitHubTree(owner: string, repo: string): Promise<GitHubTreeEntry[]> {
@@ -149,10 +164,9 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
 
   // Single file response
   if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
-    const obj = data as Record<string, unknown>;
-    if (obj.type === 'file' && typeof obj.name === 'string' && typeof obj.download_url === 'string') {
-      const name = fileSpec ?? obj.name as string;
-      return [{ name, relativePath: name, downloadUrl: obj.download_url as string }];
+    if (isGitHubContentsEntry(data) && data.type === 'file') {
+      const name = fileSpec ?? data.name;
+      return [{ name, relativePath: name, downloadUrl: data.download_url }];
     }
     // directory object — shouldn't happen for file spec
     return [];
@@ -160,11 +174,11 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
 
   if (!Array.isArray(data)) return [];
 
-  let entries = (data as Array<Record<string, unknown>>).filter((e) => e.type === 'file');
+  let entries = data.filter(isGitHubContentsEntry).filter((e) => e.type === 'file');
 
   if (globPart !== undefined) {
     const regex = globPattern(globPart);
-    entries = entries.filter((e) => typeof e.name === 'string' && regex.test(e.name as string));
+    entries = entries.filter((e) => regex.test(e.name));
   }
 
   // Compute the subdir prefix so callers can reconstruct the full source-relative path
@@ -173,8 +187,7 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
     : (fileSpec !== undefined ? `${fileSpec}/` : '');
 
   return entries
-    .filter((e) => typeof e.name === 'string' && typeof e.download_url === 'string')
-    .map((e) => ({ name: e.name as string, relativePath: `${dirPrefix}${e.name as string}`, downloadUrl: e.download_url as string }));
+    .map((e) => ({ name: e.name, relativePath: `${dirPrefix}${e.name}`, downloadUrl: e.download_url }));
 }
 
 function walkRelativeFiles(dir: string, base: string, acc: string[]): void {

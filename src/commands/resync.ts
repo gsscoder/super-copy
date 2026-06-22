@@ -20,6 +20,12 @@ export interface ResyncOptions {
   unghost: boolean;
 }
 
+function hasDownloadUrl(v: unknown): v is { download_url: string } {
+  if (typeof v !== 'object' || v === null) return false;
+  if (!('download_url' in v) || typeof v.download_url !== 'string') return false;
+  return true;
+}
+
 export async function handleResync(dest: string, opts: ResyncOptions): Promise<void> {
       const dryRun = opts.dryRun;
 
@@ -175,8 +181,8 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
                 errors++;
                 continue;
               }
-              const meta = await metaRes.json() as Record<string, unknown>;
-              if (typeof meta.download_url !== 'string') {
+              const meta: unknown = await metaRes.json();
+              if (!hasDownloadUrl(meta)) {
                 uiError(`${record.file}: no download_url in API response`);
                 errors++;
                 continue;
