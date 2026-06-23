@@ -1,0 +1,80 @@
+import path from 'node:path';
+import { getSources, addSource, removeSource, sourceExists } from '../config.js';
+import { validateLocalPath } from '../validate.js';
+import { success, error, dim, printSourceList } from '../ui.js';
+function parseLocation(location) {
+    if (location.startsWith('https://')) {
+        const url = new URL(location);
+        if (url.host !== 'github.com') {
+            return null;
+        }
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length < 2) {
+            return null;
+        }
+        const baseUrl = `${url.protocol}//${url.host}/${segments[0]}/${segments[1]}`;
+        const subPath = segments.length > 2 ? '/' + segments.slice(2).join('/') : '';
+        return { type: 'git', baseUrl, subPath };
+    }
+    return { type: 'local' };
+}
+async function handleAdd(name, location) {
+    if (sourceExists(name)) {
+        error(`source "${name}" already exists`);
+        return;
+    }
+    const parsed = parseLocation(location);
+    if (!parsed) {
+        error(`invalid location: "${location}"`);
+        return;
+    }
+    if (parsed.type === 'git') {
+        addSource({ type: 'git', name, location: parsed.baseUrl, path: parsed.subPath || undefined });
+    }
+    else {
+        const result = validateLocalPath(location);
+        if (!result.valid) {
+            error(result.error ?? 'invalid local path');
+            return;
+        }
+        addSource({ type: 'local', name, location: path.resolve(location) });
+    }
+    success(`Source "${name}" added`);
+}
+function handleRemove(name) {
+    if (!sourceExists(name)) {
+        error(`source "${name}" not found`);
+        return;
+    }
+    removeSource(name);
+    success(`Source "${name}" removed`);
+}
+function handleList() {
+    const sources = getSources();
+    if (sources.length === 0) {
+        dim('No sources registered');
+        return;
+    }
+    printSourceList(sources);
+}
+export default function register(program) {
+    const source = program
+        .command('source')
+        .description('Manage asset sources');
+    source
+        .command('add')
+        .description('Add a source (git URL or local path)')
+        .argument('<name>', 'Source name')
+        .argument('<location>', 'Git URL or local filesystem path')
+        .action(handleAdd);
+    source
+        .command('remove')
+        .description('Remove a source by name')
+        .argument('<name>', 'Source name')
+        .action(handleRemove);
+    source
+        .command('list')
+        .description('List all registered sources')
+        .action(handleList);
+}
+//# sourceMappingURL=source.js.map

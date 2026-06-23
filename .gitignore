@@ -19,9 +19,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# Build
-dist/
-
 # AI
 .claude/
 _agents/
