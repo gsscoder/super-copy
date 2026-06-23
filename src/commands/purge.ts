@@ -19,14 +19,6 @@ function confirm(msg: string): Promise<boolean> {
   });
 }
 
-function allPredicate(): (r: CopyRecord) => boolean {
-  return (): boolean => true;
-}
-
-function byDestinationPredicate(destName: string): (r: CopyRecord) => boolean {
-  return (r): boolean => r.destination === destName;
-}
-
 function applyPurge(predicate: (r: CopyRecord) => boolean, dryRun: boolean): void {
   if (dryRun) {
     const candidates = getCopies().filter(predicate);
@@ -47,7 +39,7 @@ export async function handlePurgeLog(dest: string | undefined, opts: PurgeLogOpt
     return;
   }
 
-  const predicate = dest === '*' ? allPredicate() : byDestinationPredicate(dest);
+  const predicate = dest === '*' ? (): boolean => true : (r: CopyRecord): boolean => r.destination === dest;
 
   if (!opts.dryRun && !opts.force) {
     const count = getCopies().filter(predicate).length;

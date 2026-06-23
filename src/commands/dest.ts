@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Command } from 'commander';
 import { getDestinations, addDestination, removeDestination, destinationExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
-import { success, error, dim, blank, printDestinationList } from '../ui.js';
+import { success, error, dim, printDestinationList } from '../ui.js';
 
 function handleAdd(name: string, location: string): void {
   if (destinationExists(name)) {

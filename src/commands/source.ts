@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Command } from 'commander';
 import { getSources, addSource, removeSource, sourceExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
-import { success, error, dim, blank, printSourceList } from '../ui.js';
+import { success, error, dim, printSourceList } from '../ui.js';
 
 interface ParsedGitLocation {
   type: 'git'
