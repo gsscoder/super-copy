@@ -1,8 +1,7 @@
 # Super Copy
 
-[![npm version](https://img.shields.io/badge/npm-1.0.3-blue)](https://www.npmjs.com/package/@koder-0x/scopy/v/1.0.3)
-[![license](https://img.shields.io/npm/l/@koder-0x/scopy)](LICENSE)
-[![node](https://img.shields.io/node/v/@koder-0x/scopy)](package.json)
+[![license](https://img.shields.io/github/license/gsscoder/super-copy)](LICENSE)
+[![node](https://img.shields.io/node/v/@koder0x/scopy)](package.json)
 
 A CLI tool for deploying files from registered sources to registered destinations, with tracking, re-sync, and ghost support (remove and restore tracked files).
 
@@ -17,7 +16,7 @@ I maintain a set of [Claude Code agent definitions](https://github.com/gsscoder/
 ## Install
 
 ```sh
-npm install -g @koder-0x/scopy
+npm install -g github:gsscoder/super-copy#v1.0.3
 ```
 
 ## Quickstart

@@ -1,5 +1,5 @@
 {
-  "name": "@koder-0x/scopy",
+  "name": "@koder0x/scopy",
   "version": "1.0.3",
   "description": "Tool for deploying assets from registered sources to destinations",
   "type": "module",
@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "dev": "tsx src/scopy.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
