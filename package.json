@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
+    "prepare": "",
     "dev": "tsx src/scopy.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

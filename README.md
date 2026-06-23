@@ -1,8 +1,5 @@
 # Super Copy
 
-[![license](https://img.shields.io/github/license/gsscoder/super-copy)](LICENSE)
-[![node](https://img.shields.io/node/v/@koder0x/scopy)](package.json)
-
 A CLI tool for deploying files from registered sources to registered destinations, with tracking, re-sync, and ghost support (remove and restore tracked files).
 
 Designed for single-user, local workflows: dotfiles, config files, Claude Code agents, or any asset you distribute across machines and projects.
@@ -16,7 +13,7 @@ I maintain a set of [Claude Code agent definitions](https://github.com/gsscoder/
 ## Install
 
 ```sh
-npm install -g github:gsscoder/super-copy#v1.0.3
+npm install -g https://github.com/gsscoder/super-copy/releases/download/v1.0.3/koder0x-scopy-1.0.3.tgz
 ```
 
 ## Quickstart
