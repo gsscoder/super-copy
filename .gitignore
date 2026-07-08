@@ -22,4 +22,5 @@ Thumbs.db
 # AI
 .claude/
 _agents/
-mcps/
+mcps/dist/
+mcps/context-mode/

@@ -13,7 +13,7 @@ I maintain a set of [Claude Code agent definitions](https://github.com/gsscoder/
 ## Install
 
 ```sh
-npm install -g https://github.com/gsscoder/super-copy/releases/download/v1.0.3/koder0x-scopy-1.0.3.tgz
+npm install -g @kzer0x/scopy
 ```
 
 ## Quickstart
