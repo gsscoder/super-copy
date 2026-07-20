@@ -49,6 +49,8 @@ scopy ghost
 
 Register sources (GitHub repos or local directories) and destinations (local directories), then sync files between them. GitHub sources are fetched directly via the GitHub API — no local Git installation required. Every copy is tracked so you can re-sync, inspect history, or ghost files without losing the originals.
 
+Destinations are always flat: however a file is matched — single path, glob, or `**`, nested or not — it lands at the destination root by basename, never replicating source directory structure. On resync, files no longer found in the source are untracked automatically (warned, not errored); add `--clean` to also delete them from the destination.
+
 ## Commands
 
 ```sh
@@ -66,6 +68,7 @@ scopy dest list                      # list registered destinations
 scopy sync <source>[/<glob>] <dest>  # copy files; existing files → interactive overwrite selector
 scopy sync ... --force               # overwrite all without prompting
 scopy resync <dest>                  # re-copy all tracked files from their original sources
+scopy resync <dest> --clean          # also delete destination files no longer present in source
 
 # History & state
 scopy log [dest]                     # show copy history grouped by destination
