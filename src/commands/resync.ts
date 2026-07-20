@@ -11,6 +11,7 @@ import {
   fileCacheDir,
   fileCachePath,
   setGhosted,
+  purgeCopies,
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 import type { CopyRecord, Source } from '../types.js';
@@ -18,6 +19,7 @@ import type { CopyRecord, Source } from '../types.js';
 export interface ResyncOptions {
   dryRun: boolean;
   unghost: boolean;
+  clean: boolean;
 }
 
 function hasDownloadUrl(v: unknown): v is { download_url: string } {
@@ -116,6 +118,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
       if (dryRun) {
         // Collect all valid files first, then list
         const validFiles: string[] = [];
+        const missingFiles: string[] = [];
         for (const [sourceName, group] of bySource) {
           const source: Source | undefined = sources.find((s) => s.name === sourceName);
           if (source === undefined) {
@@ -136,7 +139,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
           for (const record of group) {
             const srcPath = path.join(workTree, record.sourcePath ?? record.file);
             if (!fs.existsSync(srcPath)) {
-              uiError(`${record.file}: file not found in source`);
+              missingFiles.push(path.join(destination.location, record.file));
               continue;
             }
             validFiles.push(record.file);
@@ -147,11 +150,36 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         for (const file of validFiles) {
           console.log(chalk.dim(`· ${file}`));
         }
+
+        if (missingFiles.length > 0) {
+          console.log();
+          console.log('untracked file(s) missing from source:');
+          for (const file of missingFiles) {
+            console.log(file);
+          }
+          console.log(opts.clean ? '--clean would remove these' : "use '--clean' to automatically remove");
+        }
         return;
       }
 
       let copied = 0;
       let errors = 0;
+      const missingFiles: string[] = [];
+      const destLocation: string = destination.location;
+
+      function untrackMissing(record: CopyRecord): void {
+        purgeCopies((r) => r.destination === dest && r.file === record.file);
+        if (record.index !== undefined) {
+          const p = fileCachePath(dest, record.index);
+          if (fs.existsSync(p)) fs.rmSync(p);
+        }
+        const destPath = path.join(destLocation, record.file);
+        if (opts.clean && fs.existsSync(destPath)) {
+          fs.rmSync(destPath);
+        }
+        missingFiles.push(destPath);
+        console.log(`${chalk.yellow('⚠')} ${record.file} (missing from source, ${opts.clean ? 'removed' : 'untracked'})`);
+      }
 
       for (const [sourceName, group] of bySource) {
         const source: Source | undefined = sources.find((s) => s.name === sourceName);
@@ -177,6 +205,10 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
             try {
               const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, { headers });
               if (!metaRes.ok) {
+                if (metaRes.status === 404) {
+                  untrackMissing(record);
+                  continue;
+                }
                 uiError(`${record.file}: HTTP ${metaRes.status}`);
                 errors++;
                 continue;
@@ -219,8 +251,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         for (const record of group) {
           const srcPath = path.join(workTree, record.sourcePath ?? record.file);
           if (!fs.existsSync(srcPath)) {
-            uiError(`${record.file}: file not found in source`);
-            errors++;
+            untrackMissing(record);
             continue;
           }
 
@@ -243,8 +274,20 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
       }
 
       const copiedStr = chalk.green(String(copied));
+      const missingStr = missingFiles.length > 0 ? chalk.yellow(`${missingFiles.length} missing`) : `${missingFiles.length} missing`;
       const errorStr = errors > 0 ? chalk.red(`${errors} error(s)`) : `${errors} error(s)`;
-      console.log(`${copiedStr} copied, ${errorStr}`);
+      console.log(`${copiedStr} copied, ${missingStr}, ${errorStr}`);
+
+      if (missingFiles.length > 0) {
+        console.log();
+        console.log('untracked file(s) missing from source:');
+        for (const file of missingFiles) {
+          console.log(file);
+        }
+        if (!opts.clean) {
+          console.log("use '--clean' to automatically remove");
+        }
+      }
 
       if (errors > 0) {
         process.exitCode = 1;
@@ -257,5 +300,6 @@ export default function registerResync(program: Command): void {
     .description('Re-copy all tracked files to a destination')
     .option('--dry-run', 'Preview what would be copied without making changes')
     .option('--unghost', 'Restore ghosted files from cache')
+    .option('--clean', 'Remove destination files missing from source (implies untracking)')
     .action(handleResync);
 }

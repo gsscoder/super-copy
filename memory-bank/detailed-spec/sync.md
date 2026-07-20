@@ -45,6 +45,9 @@ Schema of `<envPaths('scopy').data>/scopy-register.json`:
 - `sourcePath` (str): full relative path within the source work tree — used by resync to re-fetch nested files
 - `copiedAt` (str): ISO 8601 timestamp of last copy
 
+## Resync
+See `tracking.md` — re-copies tracked files for a destination using the copies registry built by `sync`.
+
 ## Validation
 - Errors if source name not registered
 - Errors if destination name not registered

@@ -5,10 +5,11 @@ Commands for re-syncing, inspecting, toggling, and purging tracked file copies
 Re-copies all tracked active files for a destination from their original sources
 
 ### Command Signature
-`scopy resync <dest> [--dry-run] [--unghost]`
+`scopy resync <dest> [--dry-run] [--unghost] [--clean]`
 - `dest` (str): registered destination name
 - `--dry-run`: preview files without copying
 - `--unghost`: restore ghosted files from cache instead of re-copying active files
+- `--clean`: also delete destination files that are missing from source (see below); without it, such files are untracked but left in place
 
 ### Resolution
 - Reads all registry entries where `destination` matches `<dest>`
@@ -18,11 +19,20 @@ Re-copies all tracked active files for a destination from their original sources
 ### Copy Behaviour
 Files are overwritten without confirmation. Each copied file updates its registry entry via `addCopy` upsert (`copiedAt` timestamp) and refreshes the file cache at `fileCachePath(dest, index)`
 
+### Missing-From-Source Behaviour
+A tracked file is missing when its local source path no longer exists, or a git source's Contents API returns 404 (other fetch failures remain plain errors, keeping the entry tracked for retry). On detection, per file:
+- Prints a warning (⚠) instead of a checkmark
+- Untracks it — removes the registry entry and its cached blob — regardless of `--clean`
+- With `--clean`: also deletes the file from the destination
+- Without `--clean`: leaves the destination file in place
+- Does not set a non-zero exit code (untracking a stale file is cleanup, not a failure)
+- `--dry-run` previews the same detection without untracking, deleting, or writing anything
+
 ### `--unghost` Behaviour
-Instead of re-copying from source, restores ghosted files from `fileCachePath(dest, index)`. Sets `ghosted=false` in the registry. Active (non-ghosted) files are not touched
+Instead of re-copying from source, restores ghosted files from `fileCachePath(dest, index)`. Sets `ghosted=false` in the registry. Active (non-ghosted) files are not touched. Missing-from-source detection does not apply here
 
 ### Summary
-- Normal: `N copied, N error(s)`
+- Normal: `N copied, N missing, N error(s)`; when any files are missing, a trailing report lists their destination paths under `untracked file(s) missing from source:`, with a `use '--clean' to automatically remove` hint unless `--clean` was already used
 - Unghost: `N restored, N error(s)`
 
 ### Validation

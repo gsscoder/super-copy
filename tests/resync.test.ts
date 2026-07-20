@@ -233,4 +233,157 @@ describe('resync', () => {
     // a.txt should NOT be restored (unghost only restores ghosted files)
     expect(fs.existsSync(path.join(dirs.dest, 'a.txt'))).toBe(false);
   });
+
+  it('untracks a locally-missing file but leaves it in the destination when --clean is absent', async () => {
+    // Seed: sync a.txt; delete it from the source only (dest keeps its copy)
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', { force: true });
+
+    fs.rmSync(path.join(dirs.source, 'a.txt'));
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', {});
+
+    const { getCopies } = await import('../src/config.js');
+    // Destination file is untouched since --clean wasn't passed
+    expect(fs.existsSync(path.join(dirs.dest, 'a.txt'))).toBe(true);
+    // Registry entry is removed regardless
+    expect(getCopies().find((r) => r.file === 'a.txt')).toBeUndefined();
+    // Missing-from-source is cleanup, not a failure
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('deletes the destination file for a locally-missing source when --clean is used', async () => {
+    // Seed: sync a.txt; delete it from the source only; run resync --clean
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', { force: true });
+
+    fs.rmSync(path.join(dirs.source, 'a.txt'));
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', { clean: true });
+
+    const { getCopies } = await import('../src/config.js');
+    expect(fs.existsSync(path.join(dirs.dest, 'a.txt'))).toBe(false);
+    expect(getCopies().find((r) => r.file === 'a.txt')).toBeUndefined();
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('deletes the destination file for a 404 git source when --clean is used', async () => {
+    // Seed: a tracked git record whose destination file already exists (git dest files
+    // aren't pre-populated via handleSync, so write it manually)
+    const { addSource, addDestination, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo', path: '/agents' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+    addCopy({ source: 'git-src', destination: 'git-dst', file: 'missing.md', sourcePath: 'implement/missing.md', copiedAt: new Date().toISOString() });
+    fs.writeFileSync(path.join(dirs.dest, 'missing.md'), 'stale');
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return { ok: false, status: 404 } as Response;
+    });
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('git-dst', { clean: true });
+
+    expect(fs.existsSync(path.join(dirs.dest, 'missing.md'))).toBe(false);
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('deletes the cached blob when untracking a locally-missing file', async () => {
+    // Seed: sync a.txt (populates the file cache), then remove it from source only
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', { force: true });
+
+    const { getCopies, fileCachePath } = await import('../src/config.js');
+    const entry = getCopies().find((r) => r.file === 'a.txt');
+    if (entry === undefined || entry.index === undefined) throw new Error('a.txt entry missing index');
+    const cachePath = fileCachePath('test-dst', entry.index);
+    expect(fs.existsSync(cachePath)).toBe(true);
+
+    fs.rmSync(path.join(dirs.source, 'a.txt'));
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', {});
+
+    // Cache blob is removed alongside the registry entry, regardless of --clean
+    expect(fs.existsSync(cachePath)).toBe(false);
+  });
+
+  it('treats non-404 git fetch failures as real errors, not missing files', async () => {
+    const { addSource, addDestination, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo', path: '/agents' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+    addCopy({ source: 'git-src', destination: 'git-dst', file: 'broken.md', sourcePath: 'implement/broken.md', copiedAt: new Date().toISOString() });
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return { ok: false, status: 500 } as Response;
+    });
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('git-dst', {});
+
+    const { getCopies } = await import('../src/config.js');
+    // Unlike a 404, a non-404 failure keeps the entry tracked for retry
+    expect(getCopies().find((r) => r.file === 'broken.md')).toBeDefined();
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('untracks a missing file without tripping the exit code while a real error in the same run still does', async () => {
+    // Seed: a.txt (stays valid), b.txt (deleted from source only, becomes missing),
+    // and ghost.txt (references an unregistered source, a real error)
+    populateSource(dirs.source, { 'a.txt': 'alpha', 'b.txt': 'bravo' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', { force: true });
+
+    const { addCopy, getCopies } = await import('../src/config.js');
+    addCopy({ source: 'removed-src', destination: 'test-dst', file: 'ghost.txt', copiedAt: new Date().toISOString() });
+
+    fs.rmSync(path.join(dirs.source, 'b.txt'));
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', {});
+
+    // a.txt: valid file, re-copied from source
+    expect(fs.readFileSync(path.join(dirs.dest, 'a.txt'), 'utf8')).toBe('alpha');
+
+    // b.txt: missing from source, untracked but left in place (no --clean)
+    expect(fs.existsSync(path.join(dirs.dest, 'b.txt'))).toBe(true);
+    expect(getCopies().find((r) => r.file === 'b.txt')).toBeUndefined();
+
+    // ghost.txt: unregistered source is a real error and still trips the exit code
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('--dry-run previews a missing file without untracking, deleting, or writing anything', async () => {
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', { force: true });
+
+    fs.rmSync(path.join(dirs.source, 'a.txt'));
+
+    const { getCopies } = await import('../src/config.js');
+    const before = getCopies();
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', { dryRun: true });
+
+    // Destination file is left exactly as it was (still present, untouched)
+    expect(fs.existsSync(path.join(dirs.dest, 'a.txt'))).toBe(true);
+
+    // Registry is unchanged: nothing untracked during a dry run
+    expect(getCopies()).toEqual(before);
+  });
 });
