@@ -101,6 +101,22 @@ describe('fetchGitHubFiles', () => {
     expect(result).toHaveLength(2);
   });
 
+  it('flattens single-file response for nested specific file path', async () => {
+    const mockEntry = { type: 'file', name: 'CLAUDE.md', download_url: 'https://raw.githubusercontent.com/owner/repo/HEAD/subdir/CLAUDE.md' };
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockEntry,
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    const result = await fetchGitHubFiles('owner', 'repo', '', 'subdir/CLAUDE.md');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('CLAUDE.md');
+    expect(result[0].relativePath).toBe('subdir/CLAUDE.md');
+  });
+
   it('throws on non-ok GitHub API response', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,

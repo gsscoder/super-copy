@@ -80,14 +80,19 @@ describe('sync', () => {
     expect(destFiles).toHaveLength(2);
   });
 
-  it('copies nested file preserving relative path', async () => {
+  it('flattens nested specific file to dest root', async () => {
     populateSource(dirs.source, { 'subdir/file.txt': 'nested' });
     const { handleSync } = await import('../src/commands/sync.js');
     await handleSync('test-src/subdir/file.txt', 'test-dst', {});
 
-    const nestedPath = path.join(dirs.dest, 'subdir', 'file.txt');
-    expect(fs.existsSync(nestedPath)).toBe(true);
-    expect(fs.readFileSync(nestedPath, 'utf8')).toBe('nested');
+    const destFiles = fs.readdirSync(dirs.dest);
+    expect(destFiles).toEqual(['file.txt']);
+    expect(fs.readFileSync(path.join(dirs.dest, 'file.txt'), 'utf8')).toBe('nested');
+    expect(destFiles).not.toContain('subdir');
+
+    const { getCopies } = await import('../src/config.js');
+    const copies = getCopies();
+    expect(copies[0].sourcePath).toBe('subdir/file.txt');
   });
 
   it('dry-run does not write files', async () => {

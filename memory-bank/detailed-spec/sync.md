@@ -14,7 +14,8 @@ Command for copying files from a registered source to a registered destination. 
 - `/<globstar>`: e.g. `mysource/**/*.md` — recursively matches files at any depth under the work tree; only files are copied, never directories
 - `/<globstar>` alone: e.g. `mysource/**` — all files recursively under the work tree
 - `/<path>`: e.g. `mysource/CLAUDE.md` — copies a single specific file; a directory path expands its immediate files (non-recursive)
-- Glob patterns use `*` (single segment) and `**` (zero or more path segments); matched files are always flattened to the destination root (basename only)
+- Glob patterns use `*` (single segment) and `**` (zero or more path segments)
+- The destination never replicates source directory structure: every matched file — single path, glob, or globstar, nested or not — is flattened to the destination root by basename. Only `sourcePath` in the copies registry retains the full source-relative path, for resync
 
 ## Git Source Handling
 Git sources (GitHub HTTPS URLs) are fetched directly from the GitHub API — no local clone is made.

@@ -165,8 +165,8 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
   // Single file response
   if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
     if (isGitHubContentsEntry(data) && data.type === 'file') {
-      const name = fileSpec ?? data.name;
-      return [{ name, relativePath: name, downloadUrl: data.download_url }];
+      const relativePath = fileSpec ?? data.name;
+      return [{ name: data.name, relativePath, downloadUrl: data.download_url }];
     }
     // directory object — shouldn't happen for file spec
     return [];
@@ -280,7 +280,9 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
       .filter((e) => e.isFile())
       .map((e) => ({ src: path.join(srcPath, e.name), rel: e.name, sourcePath: `${fileSpec}/${e.name}` }));
   }
-  return [{ src: srcPath, rel: fileSpec, sourcePath: fileSpec }];
+  const specSlash = fileSpec.lastIndexOf('/');
+  const name = specSlash === -1 ? fileSpec : fileSpec.slice(specSlash + 1);
+  return [{ src: srcPath, rel: name, sourcePath: fileSpec }];
 }
 
 export async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
