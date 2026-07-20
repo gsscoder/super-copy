@@ -196,8 +196,11 @@ describe('resync', () => {
     const { handleResync } = await import('../src/commands/resync.js');
     await handleResync('git-dst', {});
 
-    expect(process.exitCode).toBe(1);
+    expect(process.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dirs.dest, 'missing.md'))).toBe(false);
+
+    const { getCopies } = await import('../src/config.js');
+    expect(getCopies().find((r) => r.file === 'missing.md')).toBeUndefined();
   });
 
   it('--unghost restores ghosted files from cache, ignores active files', async () => {
