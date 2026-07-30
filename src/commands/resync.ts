@@ -15,11 +15,13 @@ import {
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 import type { CopyRecord, Source } from '../types.js';
+import { resolveBranchSha } from '../github.js';
 
 export interface ResyncOptions {
   dryRun: boolean;
   unghost: boolean;
   clean: boolean;
+  branch?: string;
 }
 
 function hasDownloadUrl(v: unknown): v is { download_url: string } {
@@ -129,6 +131,18 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
           }
 
           if (source.type === 'git') {
+            if (opts.branch !== undefined) {
+              const urlParts = new URL(source.location).pathname.split('/').filter(Boolean);
+              const owner = urlParts[0];
+              const repo = urlParts[1];
+              try {
+                const sha = await resolveBranchSha(owner, repo, opts.branch);
+                console.log(chalk.dim(`↳ ${sourceName}: using branch "${opts.branch}" (${sha.slice(0, 7)})`));
+              } catch (err) {
+                uiError(`${sourceName}: error resolving branch "${opts.branch}": ${err instanceof Error ? err.message : String(err)}`);
+                continue;
+              }
+            }
             for (const record of group) {
               validFiles.push(record.file);
             }
@@ -199,11 +213,24 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
           const subPath = source.path ? source.path.replace(/^\//, '') : '';
           const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
 
+          let sha: string | undefined;
+          if (opts.branch !== undefined) {
+            try {
+              sha = await resolveBranchSha(owner, repo, opts.branch);
+              console.log(chalk.dim(`↳ ${sourceName}: using branch "${opts.branch}" (${sha.slice(0, 7)})`));
+            } catch (err) {
+              uiError(`${sourceName}: error resolving branch "${opts.branch}": ${err instanceof Error ? err.message : String(err)}`);
+              errors += group.length;
+              continue;
+            }
+          }
+
           for (const record of group) {
             const fileRelPath = record.sourcePath ?? record.file;
             const filePath = subPath ? `${subPath}/${fileRelPath}` : fileRelPath;
             try {
-              const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`, { headers });
+              const refQuery = sha !== undefined ? `?ref=${sha}` : '';
+              const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}${refQuery}`, { headers });
               if (!metaRes.ok) {
                 if (metaRes.status === 404) {
                   untrackMissing(record);
@@ -301,5 +328,6 @@ export default function registerResync(program: Command): void {
     .option('--dry-run', 'Preview what would be copied without making changes')
     .option('--unghost', 'Restore ghosted files from cache')
     .option('--clean', 'Remove destination files missing from source (implies untracking)')
+    .option('--branch <name>', 'Fetch git source files from this branch instead of the default')
     .action(handleResync);
 }

@@ -386,4 +386,120 @@ describe('resync', () => {
     // Registry is unchanged: nothing untracked during a dry run
     expect(getCopies()).toEqual(before);
   });
+
+  it('--branch resolves a ref for the git group only; the local group is unaffected', async () => {
+    const { addSource, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo' });
+
+    populateSource(dirs.source, { 'local.txt': 'local content' });
+    addCopy({ source: 'test-src', destination: 'test-dst', file: 'local.txt', sourcePath: 'local.txt', copiedAt: new Date().toISOString() });
+    addCopy({ source: 'git-src', destination: 'test-dst', file: 'a.md', sourcePath: 'a.md', copiedAt: new Date().toISOString() });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/commits/')) {
+        return { ok: true, text: async () => 'branchsha1' } as Response;
+      }
+      if (u.includes('api.github.com')) {
+        return {
+          ok: true,
+          json: async () => ({ type: 'file', name: 'a.md', download_url: 'https://raw.githubusercontent.com/owner/repo/branchsha1/a.md' }),
+        } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array(Buffer.from('git content')).buffer } as Response;
+    });
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', { branch: 'somebranch' });
+
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('contents/a.md?ref=branchsha1'))).toBe(true);
+
+    // Local group copied normally, untouched by --branch
+    expect(fs.existsSync(path.join(dirs.dest, 'local.txt'))).toBe(true);
+    expect(fs.readFileSync(path.join(dirs.dest, 'local.txt'), 'utf8')).toBe('local content');
+
+    // Git group copied using the resolved ref
+    expect(fs.existsSync(path.join(dirs.dest, 'a.md'))).toBe(true);
+    expect(fs.readFileSync(path.join(dirs.dest, 'a.md'), 'utf8')).toBe('git content');
+  });
+
+  it('resolves the branch separately per repo across git groups, not cached/reused', async () => {
+    const { addSource, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src-1', location: 'https://github.com/owner/repo1' });
+    addSource({ type: 'git', name: 'git-src-2', location: 'https://github.com/owner/repo2' });
+    addCopy({ source: 'git-src-1', destination: 'test-dst', file: 'a.md', sourcePath: 'a.md', copiedAt: new Date().toISOString() });
+    addCopy({ source: 'git-src-2', destination: 'test-dst', file: 'b.md', sourcePath: 'b.md', copiedAt: new Date().toISOString() });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/commits/')) {
+        return { ok: true, text: async () => (u.includes('repo1') ? 'sha-repo1' : 'sha-repo2') } as Response;
+      }
+      if (u.includes('api.github.com')) {
+        const isRepo1 = u.includes('repo1');
+        const file = isRepo1 ? 'a.md' : 'b.md';
+        const repo = isRepo1 ? 'repo1' : 'repo2';
+        return { ok: true, json: async () => ({ type: 'file', name: file, download_url: `https://raw.githubusercontent.com/owner/${repo}/HEAD/${file}` }) } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array(Buffer.from('content')).buffer } as Response;
+    });
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', { branch: 'shared-branch' });
+
+    const commitCalls = fetchSpy.mock.calls.map((c) => String(c[0])).filter((u) => u.includes('/commits/'));
+    expect(commitCalls).toHaveLength(2);
+    expect(commitCalls).toContain('https://api.github.com/repos/owner/repo1/commits/shared-branch');
+    expect(commitCalls).toContain('https://api.github.com/repos/owner/repo2/commits/shared-branch');
+  });
+
+  it('isolates a 404 branch resolution to its own git group; the other group still copies', async () => {
+    const { addSource, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-good', location: 'https://github.com/owner/good-repo' });
+    addSource({ type: 'git', name: 'git-bad', location: 'https://github.com/owner/bad-repo' });
+    addCopy({ source: 'git-good', destination: 'test-dst', file: 'good.md', sourcePath: 'good.md', copiedAt: new Date().toISOString() });
+    addCopy({ source: 'git-bad', destination: 'test-dst', file: 'bad.md', sourcePath: 'bad.md', copiedAt: new Date().toISOString() });
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/commits/')) {
+        if (u.includes('bad-repo')) return { ok: false, status: 404 } as Response;
+        return { ok: true, text: async () => 'good-sha' } as Response;
+      }
+      if (u.includes('api.github.com')) {
+        return {
+          ok: true,
+          json: async () => ({ type: 'file', name: 'good.md', download_url: 'https://raw.githubusercontent.com/owner/good-repo/good-sha/good.md' }),
+        } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array(Buffer.from('good content')).buffer } as Response;
+    });
+
+    process.exitCode = 0;
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', { branch: 'feature-x' });
+
+    expect(fs.existsSync(path.join(dirs.dest, 'good.md'))).toBe(true);
+    expect(fs.existsSync(path.join(dirs.dest, 'bad.md'))).toBe(false);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('--dry-run surfaces a 404 branch resolution failure instead of silently listing files as valid', async () => {
+    const { addSource, addCopy } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo' });
+    addCopy({ source: 'git-src', destination: 'test-dst', file: 'a.md', sourcePath: 'a.md', copiedAt: new Date().toISOString() });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { handleResync } = await import('../src/commands/resync.js');
+    await handleResync('test-dst', { dryRun: true, branch: 'bad-branch' });
+
+    const logged = logSpy.mock.calls.map((c) => c.join(' '));
+    expect(logged.some((line) => line.includes('error resolving branch "bad-branch"'))).toBe(true);
+    expect(logged.some((line) => line.includes('Would copy 0 file(s)'))).toBe(true);
+  });
 });

@@ -22,6 +22,7 @@ import {
   hasGlobstar,
   matchGlobstar,
 } from '../glob.js';
+import { resolveBranchSha } from '../github.js';
 
 async function selectOverwrites(names: string[]): Promise<Set<string>> {
   if (names.length === 0) return new Set();
@@ -71,8 +72,8 @@ function isGitHubTreeResponse(v: unknown): v is { tree: unknown[]; truncated?: b
   return true;
 }
 
-async function fetchGitHubTree(owner: string, repo: string): Promise<GitHubTreeEntry[]> {
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`;
+async function fetchGitHubTree(owner: string, repo: string, ref: string | undefined): Promise<GitHubTreeEntry[]> {
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${ref ?? 'HEAD'}?recursive=1`;
   const res = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
   if (!res.ok) {
     throw new Error(`GitHub API error ${res.status} for ${apiUrl}`);
@@ -97,11 +98,12 @@ async function fetchGitHubFilesRecursive(
   repo: string,
   subPath: string,
   fileSpec: string,
+  ref: string | undefined,
 ): Promise<GitHubFile[]> {
   const dirPath = subPath ? subPath.replace(/^\//, '') : '';
   const prefix = dirPath ? `${dirPath}/` : '';
 
-  const tree = await fetchGitHubTree(owner, repo);
+  const tree = await fetchGitHubTree(owner, repo, ref);
   const blobs = tree.filter((e) => e.type === 'blob');
 
   const matched = blobs
@@ -122,7 +124,7 @@ async function fetchGitHubFilesRecursive(
       return {
         name,
         relativePath: workTreePath,
-        downloadUrl: `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${repoPath}`,
+        downloadUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${ref ?? 'HEAD'}/${repoPath}`,
       };
     });
 
@@ -130,9 +132,9 @@ async function fetchGitHubFilesRecursive(
   return matched;
 }
 
-export async function fetchGitHubFiles(owner: string, repo: string, subPath: string, fileSpec: string | undefined): Promise<GitHubFile[]> {
+export async function fetchGitHubFiles(owner: string, repo: string, subPath: string, fileSpec: string | undefined, ref: string | undefined): Promise<GitHubFile[]> {
   if (fileSpec !== undefined && hasGlobstar(fileSpec)) {
-    return fetchGitHubFilesRecursive(owner, repo, subPath, fileSpec);
+    return fetchGitHubFilesRecursive(owner, repo, subPath, fileSpec, ref);
   }
 
   const dirPath = subPath ? subPath.replace(/^\//, '') : '';
@@ -154,7 +156,7 @@ export async function fetchGitHubFiles(owner: string, repo: string, subPath: str
     listPath = dirPath;
   }
 
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${listPath}`;
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${listPath}${ref !== undefined ? `?ref=${ref}` : ''}`;
   const res = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
   if (!res.ok) {
     throw new Error(`GitHub API error ${res.status} for ${apiUrl}`);
@@ -285,7 +287,7 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
   return [{ src: srcPath, rel: name, sourcePath: fileSpec }];
 }
 
-export async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean }): Promise<void> {
+export async function handleSync(sourceSpec: string, destName: string, options: { force?: boolean; dryRun?: boolean; branch?: string }): Promise<void> {
   const { dryRun } = options;
   const force = (options.force ?? false) || getPref('sync.allowOverwrite');
 
@@ -320,6 +322,11 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
     return;
   }
 
+  if (options.branch !== undefined && source.type !== 'git') {
+    uiError('--branch is only valid for git sources');
+    return;
+  }
+
   if (!force && !dryRun && !isTipDismissed('sync.allowOverwrite')) {
     console.log(chalk.dim('💡 you can run `scopy config sync.allowOverwrite true` to skip overwrite confirmation'));
   }
@@ -331,9 +338,20 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
     const repo = urlParts[1];
     const subPath = source.path ?? '';
 
+    let ref: string | undefined;
+    if (options.branch !== undefined) {
+      try {
+        ref = await resolveBranchSha(owner, repo, options.branch);
+        console.log(chalk.dim(`↳ using branch "${options.branch}" (${ref.slice(0, 7)})`));
+      } catch (err) {
+        uiError(`error resolving branch: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    }
+
     let gitFiles: GitHubFile[];
     try {
-      gitFiles = await fetchGitHubFiles(owner, repo, subPath, fileSpec);
+      gitFiles = await fetchGitHubFiles(owner, repo, subPath, fileSpec, ref);
     } catch (err) {
       uiError(`error fetching files from GitHub: ${err instanceof Error ? err.message : String(err)}`);
       return;
@@ -482,5 +500,6 @@ export default function register(program: Command): void {
     .argument('<dest>', 'Destination name')
     .option('--force', 'Skip overwrite confirmation')
     .option('--dry-run', 'Preview without copying')
+    .option('--branch <name>', 'Fetch git source files from this branch instead of the default')
     .action(handleSync);
 }

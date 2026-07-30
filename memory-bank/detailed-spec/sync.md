@@ -2,11 +2,12 @@
 Command for copying files from a registered source to a registered destination. Handles git and local sources, optional file filtering, overwrite confirmation, and a persistent copies registry.
 
 ## Command Signature
-`scopy sync <source-spec> <dest> [--force] [--dry-run]`
+`scopy sync <source-spec> <dest> [--force] [--dry-run] [--branch <name>]`
 - `source-spec` (str): `<sourceName>[/<fileSpec>]` — registered source name, optionally followed by `/` and a file path or glob pattern
 - `dest` (str): registered destination name
 - `--force`: skip overwrite confirmation (also honoured when `sync.allowOverwrite` pref is true)
 - `--dry-run`: preview files to be copied without copying
+- `--branch <name>`: fetch git source files from this branch instead of the default; valid only for git sources; not persisted — resync won't remember the branch unless `--branch` is passed again
 
 ## Source Spec Resolution
 - No `/<fileSpec>`: copies all files at the root of the source work tree (non-recursive)
@@ -23,6 +24,7 @@ Git sources (GitHub HTTPS URLs) are fetched directly from the GitHub API — no 
 - Globstar specs (`**` in fileSpec): full tree from `https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1`; blobs filtered by globstar match, then downloaded from raw URL per matched path
 - If source has a `path` field, it scopes the work tree; API paths are relative to that root
 - Errors if the tree response is `truncated` (repo too large — user must narrow the query)
+- With `--branch <name>`: the branch is resolved once to a commit SHA (`https://api.github.com/repos/{owner}/{repo}/commits/{branch}`) before any file listing; that SHA — never the raw branch name — replaces `HEAD` in all three URLs above (`git/trees/{sha}`, `contents/{path}?ref={sha}`, `raw.githubusercontent.com/.../{sha}/{path}`), avoiding ambiguity with slashes in branch names like `feature/x`. Without `--branch`, all three URLs use `HEAD` (or omit `ref`) exactly as before
 
 ## Copy Behaviour
 Files matched by glob or globstar are copied flat into the destination directory (basename only — no subdirectory structure preserved)
@@ -52,6 +54,8 @@ See `tracking.md` — re-copies tracked files for a destination using the copies
 ## Validation
 - Errors if source name not registered
 - Errors if destination name not registered
+- Errors if `--branch` is used with a non-git source
+- Errors if `--branch` names a branch that doesn't exist in the repo
 - Errors on flattening basename collision within a single sync query (lists all conflicts)
 - Errors if fileSpec escapes the source work tree (path traversal)
 - Silently skips if no files match the spec

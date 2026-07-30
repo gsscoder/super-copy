@@ -25,6 +25,7 @@ describe('sync', () => {
     delete process.env.SCOPY_DATA_DIR;
     cleanup(dirs);
     vi.resetModules();
+    vi.restoreAllMocks();
   });
 
   it('copies all root files when no fileSpec', async () => {
@@ -256,5 +257,80 @@ describe('sync', () => {
 
     const { getCopies } = await import('../src/config.js');
     expect(getCopies()).toHaveLength(0);
+  });
+
+  it('resolves --branch to a SHA and uses it (not the raw branch name) in GitHub URLs', async () => {
+    const { addSource, addDestination } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/commits/')) {
+        return { ok: true, text: async () => 'resolvedsha123' } as Response;
+      }
+      if (u.includes('api.github.com')) {
+        return {
+          ok: true,
+          json: async () => [{ type: 'file', name: 'a.md', download_url: 'https://raw.githubusercontent.com/owner/repo/resolvedsha123/a.md' }],
+        } as Response;
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array(Buffer.from('content')).buffer } as Response;
+    });
+
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('git-src', 'git-dst', { branch: 'feature-x', force: true });
+
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(urls).toContain('https://api.github.com/repos/owner/repo/commits/feature-x');
+    expect(urls.some((u) => u.includes('contents/') && u.includes('?ref=resolvedsha123'))).toBe(true);
+    expect(urls.every((u) => !u.includes('?ref=feature-x'))).toBe(true);
+    expect(fs.existsSync(path.join(dirs.dest, 'a.md'))).toBe(true);
+  });
+
+  it('rejects --branch on a local source without touching the filesystem', async () => {
+    populateSource(dirs.source, { 'a.txt': 'alpha' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', { branch: 'feature-x' });
+
+    expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
+  });
+
+  it('copies nothing when branch resolution 404s', async () => {
+    const { addSource, addDestination } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 404 } as Response);
+
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('git-src', 'git-dst', { branch: 'nonexistent' });
+
+    expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
+  });
+
+  it('--dry-run with --branch still resolves the branch and fetches the file listing', async () => {
+    const { addSource, addDestination } = await import('../src/config.js');
+    addSource({ type: 'git', name: 'git-src', location: 'https://github.com/owner/repo' });
+    addDestination({ name: 'git-dst', location: dirs.dest });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/commits/')) {
+        return { ok: true, text: async () => 'dryrunsha' } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => [{ type: 'file', name: 'a.md', download_url: 'https://raw.githubusercontent.com/owner/repo/dryrunsha/a.md' }],
+      } as Response;
+    });
+
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('git-src', 'git-dst', { branch: 'feature-x', dryRun: true });
+
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(urls).toContain('https://api.github.com/repos/owner/repo/commits/feature-x');
+    expect(urls.some((u) => u.includes('?ref=dryrunsha'))).toBe(true);
+    expect(fs.readdirSync(dirs.dest)).toHaveLength(0);
   });
 });

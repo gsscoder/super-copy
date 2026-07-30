@@ -5,16 +5,18 @@ Commands for re-syncing, inspecting, toggling, and purging tracked file copies
 Re-copies all tracked active files for a destination from their original sources
 
 ### Command Signature
-`scopy resync <dest> [--dry-run] [--unghost] [--clean]`
+`scopy resync <dest> [--dry-run] [--unghost] [--clean] [--branch <name>]`
 - `dest` (str): registered destination name
 - `--dry-run`: preview files without copying
 - `--unghost`: restore ghosted files from cache instead of re-copying active files
 - `--clean`: also delete destination files that are missing from source (see below); without it, such files are untracked but left in place
+- `--branch <name>`: fetch git source groups from this branch instead of the default; not persisted in the registry — a later resync without `--branch` falls back to the default branch
 
 ### Resolution
 - Reads all registry entries where `destination` matches `<dest>`
 - Groups entries by source name
 - Handles git sources (fetches each file from `https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{subPath}/{file}`) and local sources
+- With `--branch <name>`: for each git source group, the branch is resolved once (per group, not globally — a resync can span multiple git sources across different repos) to a commit SHA via `https://api.github.com/repos/{owner}/{repo}/commits/{branch}`; that SHA is appended as `?ref={sha}` to the group's Contents API requests. A no-op for local-source groups
 
 ### Copy Behaviour
 Files are overwritten without confirmation. Each copied file updates its registry entry via `addCopy` upsert (`copiedAt` timestamp) and refreshes the file cache at `fileCachePath(dest, index)`
@@ -38,6 +40,7 @@ Instead of re-copying from source, restores ghosted files from `fileCachePath(de
 ### Validation
 - Errors if dest not registered
 - Errors if no tracked files exist for dest
+- If `--branch <name>` names a branch that doesn't exist for a given git source, only that source's group fails (error reported, error count bumped by the group's file count); other groups still resync normally
 
 ## Log
 Shows tracked files grouped by destination, read from the copies registry

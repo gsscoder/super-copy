@@ -173,4 +173,112 @@ describe('fetchGitHubFiles', () => {
     const { fetchGitHubFiles } = await import('../src/commands/sync.js');
     await expect(fetchGitHubFiles('owner', 'repo', '', '**/*.md')).rejects.toThrow(/flattening collision/);
   });
+
+  it('appends ?ref=<ref> to the Contents API URL when ref is provided', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    await fetchGitHubFiles('owner', 'repo', '', undefined, 'my-branch-sha');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.github.com/repos/owner/repo/contents/?ref=my-branch-sha',
+      expect.anything(),
+    );
+  });
+
+  it('omits ?ref= from the Contents API URL when ref is undefined (regression guard)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    await fetchGitHubFiles('owner', 'repo', '', undefined, undefined);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.github.com/repos/owner/repo/contents/',
+      expect.anything(),
+    );
+  });
+
+  it('uses ref instead of HEAD for the tree URL and raw download URLs in the globstar path', async () => {
+    const mockTree = {
+      tree: [
+        { path: 'root.md', type: 'blob' },
+      ],
+      truncated: false,
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => mockTree,
+    } as Response);
+
+    const { fetchGitHubFiles } = await import('../src/commands/sync.js');
+    const result = await fetchGitHubFiles('owner', 'repo', '', '**/*.md', 'abc123sha');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.github.com/repos/owner/repo/git/trees/abc123sha?recursive=1',
+      expect.anything(),
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].downloadUrl).toBe('https://raw.githubusercontent.com/owner/repo/abc123sha/root.md');
+  });
+});
+
+describe('resolveBranchSha', () => {
+  let dirs: TestDirs;
+
+  beforeEach(() => {
+    dirs = makeTempDirs();
+    process.env.SCOPY_CONFIG_DIR = dirs.config;
+    process.env.SCOPY_DATA_DIR = dirs.data;
+  });
+
+  afterEach(() => {
+    delete process.env.SCOPY_CONFIG_DIR;
+    delete process.env.SCOPY_DATA_DIR;
+    cleanup(dirs);
+    vi.resetModules();
+    vi.restoreAllMocks();
+  });
+
+  it('hits the commits/{branch} endpoint with the sha Accept header and returns the trimmed text body', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: async () => 'abc123sha\n',
+    } as Response);
+
+    const { resolveBranchSha } = await import('../src/github.js');
+    const sha = await resolveBranchSha('owner', 'repo', 'feature-x');
+
+    expect(sha).toBe('abc123sha');
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.github.com/repos/owner/repo/commits/feature-x',
+      { headers: { Accept: 'application/vnd.github.sha', 'X-GitHub-Api-Version': '2022-11-28' } },
+    );
+  });
+
+  it('throws a distinguishable error on 404 (branch not found)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 404,
+    } as Response);
+
+    const { resolveBranchSha } = await import('../src/github.js');
+    await expect(resolveBranchSha('owner', 'repo', 'nope')).rejects.toThrow('branch "nope" not found in owner/repo');
+  });
+
+  it('throws a distinguishable error on other non-ok statuses (500)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 500,
+    } as Response);
+
+    const { resolveBranchSha } = await import('../src/github.js');
+    await expect(resolveBranchSha('owner', 'repo', 'main')).rejects.toThrow('GitHub API error 500');
+  });
 });
