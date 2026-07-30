@@ -1,6 +1,6 @@
 {
   "name": "@kzer0x/scopy",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Tool for deploying assets from registered sources to destinations",
   "type": "module",
   "bin": {
