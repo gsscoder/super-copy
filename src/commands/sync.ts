@@ -23,6 +23,7 @@ import {
   matchGlobstar,
 } from '../glob.js';
 import { resolveBranchSha } from '../github.js';
+import { resolveInside } from '../safe-path.js';
 
 async function selectOverwrites(names: string[]): Promise<Set<string>> {
   if (names.length === 0) return new Set();
@@ -208,7 +209,6 @@ function resolveFilesRecursive(
   workTree: string,
   fileSpec: string,
 ): Array<{ src: string; rel: string; sourcePath: string }> {
-  const baseRes = path.resolve(workTree);
   const relativePaths: string[] = [];
   walkRelativeFiles(workTree, workTree, relativePaths);
 
@@ -223,11 +223,7 @@ function resolveFilesRecursive(
   return matchedPaths.map((rel) => {
     const slash = rel.lastIndexOf('/');
     const name = slash === -1 ? rel : rel.slice(slash + 1);
-    const src = path.join(workTree, ...rel.split('/'));
-    const resolvedSrc = path.resolve(src);
-    if (!resolvedSrc.startsWith(baseRes + path.sep) && resolvedSrc !== baseRes) {
-      throw new Error(`fileSpec escapes base directory: ${fileSpec}`);
-    }
+    const src = resolveInside(workTree, rel, { realpath: true });
     return { src, rel: name, sourcePath: rel };
   });
 }
@@ -248,12 +244,7 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
     const dirPart = lastSlash === -1 ? '' : fileSpec.slice(0, lastSlash);
     const globPart = fileSpec.slice(lastSlash + 1);
     const regex = globPattern(globPart);
-    const dirPath = path.join(workTree, dirPart);
-    const resolvedDir = path.resolve(dirPath);
-    const baseRes = path.resolve(workTree);
-    if (resolvedDir !== baseRes && !resolvedDir.startsWith(baseRes + path.sep)) {
-      throw new Error(`fileSpec escapes base directory: ${fileSpec}`);
-    }
+    const dirPath = dirPart === '' || dirPart === '.' ? workTree : resolveInside(workTree, dirPart, { realpath: true });
 
     if (!fs.existsSync(dirPath)) {
       return [];
@@ -269,11 +260,7 @@ function resolveFiles(workTree: string, fileSpec: string | undefined): Array<{ s
   }
 
   // Specific file path
-  const srcPath = path.join(workTree, fileSpec);
-  const resolvedSrc = path.resolve(srcPath);
-  if (!resolvedSrc.startsWith(path.resolve(workTree) + path.sep)) {
-    throw new Error(`fileSpec escapes base directory: ${fileSpec}`);
-  }
+  const srcPath = resolveInside(workTree, fileSpec, { realpath: true });
   if (!fs.existsSync(srcPath)) {
     return [];
   }
@@ -374,11 +361,23 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
     let skipped = 0;
     const copyErrors: Array<{ file: string; err: Error }> = [];
 
-    const conflicting = gitFiles.filter((f) => fs.existsSync(path.join(dest.location, f.name))).map((f) => f.name);
+    const safeGitFiles = gitFiles.filter((f) => {
+      try {
+        resolveInside(dest.location, f.name);
+        return true;
+      } catch (err) {
+        const fileErr = err instanceof Error ? err : new Error(String(err));
+        copyErrors.push({ file: f.name, err: fileErr });
+        uiError(`${f.name}: ${fileErr.message}`);
+        return false;
+      }
+    });
+
+    const conflicting = safeGitFiles.filter((f) => fs.existsSync(resolveInside(dest.location, f.name))).map((f) => f.name);
     const toOverwrite = force ? new Set(conflicting) : await selectOverwrites(conflicting);
 
-    for (const f of gitFiles) {
-      const destPath = path.join(dest.location, f.name);
+    for (const f of safeGitFiles) {
+      const destPath = resolveInside(dest.location, f.name);
       const existed = fs.existsSync(destPath);
 
       if (existed && !toOverwrite.has(f.name)) { skipped++; continue; }
@@ -446,11 +445,23 @@ export async function handleSync(sourceSpec: string, destName: string, options: 
   let skipped = 0;
   const copyErrors: Array<{ file: string; err: Error }> = [];
 
-  const conflicting = files.filter((f) => fs.existsSync(path.join(dest.location, f.rel))).map((f) => f.rel);
+  const safeFiles = files.filter((f) => {
+    try {
+      resolveInside(dest.location, f.rel);
+      return true;
+    } catch (err) {
+      const fileErr = err instanceof Error ? err : new Error(String(err));
+      copyErrors.push({ file: f.rel, err: fileErr });
+      uiError(`${f.rel}: ${fileErr.message}`);
+      return false;
+    }
+  });
+
+  const conflicting = safeFiles.filter((f) => fs.existsSync(resolveInside(dest.location, f.rel))).map((f) => f.rel);
   const toOverwrite = force ? new Set(conflicting) : await selectOverwrites(conflicting);
 
-  for (const f of files) {
-    const destPath = path.join(dest.location, f.rel);
+  for (const f of safeFiles) {
+    const destPath = resolveInside(dest.location, f.rel);
     const existed = fs.existsSync(destPath);
 
     if (existed && !toOverwrite.has(f.rel)) { skipped++; continue; }

@@ -14,6 +14,7 @@ import {
 } from '../config.js';
 import { error as uiError, dim } from '../ui.js';
 import { globPattern } from '../glob.js';
+import { resolveInside } from '../safe-path.js';
 import type { CopyRecord } from '../types.js';
 
 function toggleRecord(dest: string, destLocation: string, record: CopyRecord): void {
@@ -22,7 +23,14 @@ function toggleRecord(dest: string, destLocation: string, record: CopyRecord): v
     return;
   }
 
-  const destPath = path.join(destLocation, record.file);
+  let destPath: string;
+  try {
+    destPath = resolveInside(destLocation, record.file);
+  } catch (err) {
+    uiError(`unsafe path for "${record.file}" — skipping (${err instanceof Error ? err.message : String(err)})`);
+    process.exitCode = 1;
+    return;
+  }
 
   if (record.ghosted === false || record.ghosted === undefined) {
     const cachePath = fileCachePath(dest, record.index);

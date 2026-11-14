@@ -16,6 +16,7 @@ import {
 import { error as uiError, dim } from '../ui.js';
 import type { CopyRecord, Source } from '../types.js';
 import { resolveBranchSha } from '../github.js';
+import { resolveInside } from '../safe-path.js';
 
 export interface ResyncOptions {
   dryRun: boolean;
@@ -83,7 +84,14 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
             errs++;
             continue;
           }
-          const destPath = path.join(destination.location, record.file);
+          let destPath: string;
+          try {
+            destPath = resolveInside(destination.location, record.file);
+          } catch (err) {
+            uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+            errs++;
+            continue;
+          }
           fs.mkdirSync(path.dirname(destPath), { recursive: true });
           fs.copyFileSync(cachePath, destPath);
           setGhosted(dest, record.index, false);
@@ -151,9 +159,19 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
 
           const workTree: string = source.location;
           for (const record of group) {
-            const srcPath = path.join(workTree, record.sourcePath ?? record.file);
+            let srcPath: string;
+            try {
+              srcPath = resolveInside(workTree, record.sourcePath ?? record.file, { realpath: true });
+            } catch (err) {
+              uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+              continue;
+            }
             if (!fs.existsSync(srcPath)) {
-              missingFiles.push(path.join(destination.location, record.file));
+              try {
+                missingFiles.push(resolveInside(destination.location, record.file));
+              } catch (err) {
+                uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+              }
               continue;
             }
             validFiles.push(record.file);
@@ -182,12 +200,19 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
       const destLocation: string = destination.location;
 
       function untrackMissing(record: CopyRecord): void {
+        let destPath: string;
+        try {
+          destPath = resolveInside(destLocation, record.file);
+        } catch (err) {
+          uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+          errors++;
+          return;
+        }
         purgeCopies((r) => r.destination === dest && r.file === record.file);
         if (record.index !== undefined) {
           const p = fileCachePath(dest, record.index);
           if (fs.existsSync(p)) fs.rmSync(p);
         }
-        const destPath = path.join(destLocation, record.file);
         if (opts.clean && fs.existsSync(destPath)) {
           fs.rmSync(destPath);
         }
@@ -229,6 +254,7 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
             const fileRelPath = record.sourcePath ?? record.file;
             const filePath = subPath ? `${subPath}/${fileRelPath}` : fileRelPath;
             try {
+              const destPath = resolveInside(destination.location, record.file);
               const refQuery = sha !== undefined ? `?ref=${sha}` : '';
               const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filePath}${refQuery}`, { headers });
               if (!metaRes.ok) {
@@ -253,7 +279,6 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
                 continue;
               }
               const content = Buffer.from(await res.arrayBuffer());
-              const destPath = path.join(destination.location, record.file);
               fs.mkdirSync(path.dirname(destPath), { recursive: true });
               fs.writeFileSync(destPath, content);
               if (record.index !== undefined) {
@@ -276,13 +301,27 @@ export async function handleResync(dest: string, opts: ResyncOptions): Promise<v
         const workTree: string = source.location;
 
         for (const record of group) {
-          const srcPath = path.join(workTree, record.sourcePath ?? record.file);
+          let srcPath: string;
+          try {
+            srcPath = resolveInside(workTree, record.sourcePath ?? record.file, { realpath: true });
+          } catch (err) {
+            uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+            errors++;
+            continue;
+          }
           if (!fs.existsSync(srcPath)) {
             untrackMissing(record);
             continue;
           }
 
-          const destPath = path.join(destination.location, record.file);
+          let destPath: string;
+          try {
+            destPath = resolveInside(destination.location, record.file);
+          } catch (err) {
+            uiError(`${record.file}: ${err instanceof Error ? err.message : String(err)}`);
+            errors++;
+            continue;
+          }
           fs.mkdirSync(path.dirname(destPath), { recursive: true });
           fs.copyFileSync(srcPath, destPath);
           if (record.index !== undefined) {
