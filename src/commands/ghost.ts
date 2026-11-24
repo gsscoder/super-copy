@@ -91,20 +91,45 @@ async function handleGhostInteractive(destFilter?: string): Promise<void> {
     }
   }
 
-  const chosen = await checkbox({
-    message: '',
-    choices,
-    loop: false,
-    theme: {
-      icon: {
-        checked: chalk.red('● [ghosted]   '),
-        unchecked: chalk.green('○ [unghosted] '),
-        cursor: '›',
+  // Esc aborts (checkbox only binds Ctrl+C); the listener lives only while the prompt is open
+  const abort = new AbortController();
+  const onKeypress = (_: unknown, key?: { name?: string }): void => {
+    if (key?.name === 'escape') abort.abort();
+  };
+  process.stdin.on('keypress', onKeypress);
+
+  let chosen: Array<{ dest: string; file: string }>;
+  try {
+    chosen = await checkbox({
+      message: '',
+      choices,
+      loop: false,
+      theme: {
+        icon: {
+          checked: chalk.red('● [ghosted]   '),
+          unchecked: chalk.green('○ [unghosted] '),
+          cursor: '›',
+        },
+        prefix: { idle: '', done: '' },
+        style: {
+          answer: () => '',
+          message: () => '',
+          keysHelpTip: (keys: [key: string, action: string][]) =>
+            [...keys, ['esc', 'abort']]
+              .map(([key, action]) => `${chalk.bold(key)} ${chalk.dim(action)}`)
+              .join(chalk.dim(' • ')),
+        },
       },
-      prefix: { idle: '', done: '' },
-      style: { answer: () => '', message: () => '' },
-    },
-  });
+    }, { signal: abort.signal });
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'AbortPromptError' || err.name === 'ExitPromptError')) {
+      dim('aborted — no changes made');
+      return;
+    }
+    throw err;
+  } finally {
+    process.stdin.off('keypress', onKeypress);
+  }
 
   const nowGhosted = new Set(chosen.map((c) => `${c.dest}::${c.file}`));
 
