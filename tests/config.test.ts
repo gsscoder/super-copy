@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, makeTempDirs, setupConfig, type TestDirs } from './helpers.js';
@@ -71,5 +72,40 @@ describe('config', () => {
     expect(idx1).toBe(1);
     expect(idx2).toBe(2);
     expect(idx3).toBe(3);
+  });
+});
+
+describe('config rename rollback', () => {
+  let dirs: TestDirs;
+
+  beforeEach(async () => {
+    dirs = makeTempDirs();
+    process.env.SCOPY_CONFIG_DIR = dirs.config;
+    process.env.SCOPY_DATA_DIR = dirs.data;
+    await setupConfig(dirs);
+  });
+
+  afterEach(() => {
+    delete process.env.SCOPY_CONFIG_DIR;
+    delete process.env.SCOPY_DATA_DIR;
+    cleanup(dirs);
+    vi.resetModules();
+  });
+
+  it('renameDestination restores cache dir and records when the config write fails', async () => {
+    const { addCopy, getCopies, renameDestination, fileCacheDir, configDir } = await import('../src/config.js');
+    addCopy({ source: 'test-src', destination: 'test-dst', file: 'f.txt' });
+    fs.mkdirSync(fileCacheDir('test-dst'), { recursive: true });
+    fs.writeFileSync(path.join(fileCacheDir('test-dst'), '1'), 'x');
+
+    // make the config store unreadable: a directory where the JSON file should be
+    const store = path.join(configDir, 'scopy.json');
+    fs.rmSync(store, { force: true });
+    fs.mkdirSync(store);
+
+    expect(() => renameDestination('test-dst', 'new-dst')).toThrow();
+    expect(fs.existsSync(path.join(fileCacheDir('test-dst'), '1'))).toBe(true);
+    expect(fs.existsSync(fileCacheDir('new-dst'))).toBe(false);
+    expect(getCopies().map((c) => c.destination)).toEqual(['test-dst']);
   });
 });

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Command } from 'commander';
-import { getSources, addSource, removeSource, sourceExists } from '../config.js';
+import { getSources, addSource, removeSource, renameSource, sourceExists } from '../config.js';
 import { validateLocalPath } from '../validate.js';
 import { success, error, dim, printSourceList } from '../ui.js';
 
@@ -68,6 +68,23 @@ function handleRemove(name: string): void {
   success(`Source "${name}" removed`);
 }
 
+function handleRename(oldName: string, newName: string): void {
+  if (!sourceExists(oldName)) {
+    error(`source "${oldName}" not found`);
+    return;
+  }
+  if (oldName === newName) {
+    error(`new name must differ from the current name "${oldName}"`);
+    return;
+  }
+  if (sourceExists(newName)) {
+    error(`source "${newName}" already exists`);
+    return;
+  }
+  renameSource(oldName, newName);
+  success(`Source "${oldName}" renamed to "${newName}"`);
+}
+
 function handleList(): void {
   const sources = getSources();
   if (sources.length === 0) {
@@ -94,6 +111,13 @@ export default function register(program: Command): void {
     .description('Remove a source by name')
     .argument('<name>', 'Source name')
     .action(handleRemove);
+
+  source
+    .command('rename')
+    .description('Rename a source')
+    .argument('<old>', 'Current source name')
+    .argument('<new>', 'New source name')
+    .action(handleRename);
 
   source
     .command('list')

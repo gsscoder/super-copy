@@ -57,11 +57,13 @@ Destinations are always flat: however a file is matched — single path, glob, o
 # Sources
 scopy source add <name> <url|path>   # register a git repo or local directory
 scopy source remove <name>           # remove a registered source
+scopy source rename <old> <new>      # rename a registered source
 scopy source list                    # list registered sources
 
 # Destinations
 scopy dest add <name> <path>         # register a local directory
 scopy dest remove <name>             # remove a registered destination
+scopy dest rename <old> <new>        # rename a registered destination
 scopy dest list                      # list registered destinations
 
 # Sync

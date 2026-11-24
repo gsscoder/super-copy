@@ -1,7 +1,7 @@
 # Architecture Overview
 Target: machine consumption (AI agents) first, human readers second
 Purpose: orientation before reading code; details live in the specs linked under Pointers
-Scope: `scopy` CLI, npm `@kzer0x/scopy` v1.0.7, ~1960 LOC in `src/`
+Scope: `scopy` CLI, npm `@kzer0x/scopy` v1.0.8, ~2080 LOC in `src/`
 
 ## Purpose & Scope
 - Distributes files from registered sources to registered destinations
@@ -19,7 +19,7 @@ Scope: `scopy` CLI, npm `@kzer0x/scopy` v1.0.7, ~1960 LOC in `src/`
 ## Module Map
 - `src/scopy.ts` — entry; reads `../package.json` (checked by `isPackageJson`), builds commander program, calls `register<X>(program)` per command, `program.parse()`
 - `src/commands/*.ts` — one file per command; default export `register(program)` + exported handler(s)
-  - `source.ts`, `dest.ts` — location registration
+  - `source.ts`, `dest.ts` — location registration (`add`, `remove`, `rename`, `list`)
   - `sync.ts` (largest, 516) — copy files source -> dest
   - `resync.ts` (372) — refresh tracked files of a dest
   - `ghost.ts` — hide/restore tracked files via cache
@@ -54,6 +54,9 @@ src/types.ts
   - `{copies: CopyRecord[]}`; `CopyRecord{source, destination, file, sourcePath?, copiedAt?, index?, ghosted?}`
   - `addCopy` upserts on `destination + file`; new record gets global `index` = max + 1 (`getNextIndex`); existing `index`/`ghosted` never reassigned; missing `index`/`ghosted` migrated on upsert
   - Other API: `getCopies`, `getCopiesBySource`, `getCopiesByDestination`, `purgeCopies(predicate)`, `getCopyByIndex`, `setGhosted`
+- Location API: `getSources`/`addSource`/`removeSource`/`sourceExists`/`renameSource`; `getDestinations`/`addDestination`/`removeDestination`/`destinationExists`/`renameDestination`
+  - `renameSource(old, new)`: rewrites `CopyRecord.source` (registry), then `sources[].name`
+  - `renameDestination(old, new)`: moves `cache/<old>` -> `cache/<new>` (`fileCacheDir`), rewrites `CopyRecord.destination`, then `destinations[].name`; cache move and records rolled back if the registry/config write throws
 - File cache: `fileCachePath(dest, index)` = `<dataPath>/cache/<dest>/<index>`; holds bytes of last copy; keyed by index, not by content
 - Prefs: `PREF_KEYS` (`sync.allowOverwrite` only), `isPrefKey`, `getPrefs` (merges defaults), `getPref`, `setPref`
 - Tips: `dismissTip`, `isTipDismissed`
@@ -63,6 +66,7 @@ src/types.ts
 ### Registration
 - `source add <name> <location>`: `https://github.com/{owner}/{repo}[/{subpath}]` -> git source (repo URL + `path`); SSH and non-GitHub URLs rejected; else local path resolved + `validateLocalPath`; no network call; duplicate names rejected
 - `dest add`: local dirs only
+- `source rename <old> <new>`, `dest rename <old> <new>`: name only, location unchanged; checks in order: old not found, old === new, new exists; dest only: unsafe name (`resolveInside` against `<dataPath>/cache`), leftover records/cache for new -> hint `scopy purge log <new>`; source has no orphan check (orphan records adopted); updates copy records + cache dir (dest) so `resync`/`ghost`/`log` keep working
 
 ### sync
 `sync <source>[/<fileSpec>] <dest> [--force] [--dry-run] [--branch]`
@@ -119,7 +123,7 @@ resolve files -> flatten to basename -> resolveInside(dest)
 - JSON stores; single-user; non-concurrent
 
 ## Testing
-- `vitest`; `tests/*.test.ts` per module/command: config, config-command, fetchGitHubFiles, ghost, glob, purge, resync, safe-path, security, source, sync, types
+- `vitest`; `tests/*.test.ts` per module/command: config, config-command, dest, fetchGitHubFiles, ghost, glob, purge, resync, safe-path, security, source, sync, types
 - `tests/helpers.ts`: temp source/dest/config/data dirs; populates sources
 - Isolation via `SCOPY_CONFIG_DIR` / `SCOPY_DATA_DIR`
 

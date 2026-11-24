@@ -1,5 +1,6 @@
 import Conf from 'conf';
 import envPaths from 'env-paths';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { AppState, CopiesConfig, CopyRecord, Destination, Prefs, ScopyConfig, Source } from './types.js';
@@ -48,6 +49,24 @@ export function sourceExists(name: string): boolean {
   return getSources().some((s) => s.name === name);
 }
 
+export function renameSource(oldName: string, newName: string): void {
+  const copies = getCopies();
+  for (const record of copies) {
+    if (record.source === oldName) {
+      record.source = newName;
+    }
+  }
+  copiesConfig.set('copies', copies);
+
+  const sources = getSources();
+  for (const source of sources) {
+    if (source.name === oldName) {
+      source.name = newName;
+    }
+  }
+  config.set('sources', sources);
+}
+
 export function getDestinations(): Destination[] {
   return config.get('destinations');
 }
@@ -71,6 +90,43 @@ export function removeDestination(name: string): boolean {
 
 export function destinationExists(name: string): boolean {
   return getDestinations().some((d) => d.name === name);
+}
+
+export function renameDestination(oldName: string, newName: string): void {
+  const oldDir = fileCacheDir(oldName);
+  const newDir = fileCacheDir(newName);
+  const copies = getCopies();
+  const original = structuredClone(copies);
+  const hasCache = fs.existsSync(oldDir);
+  if (hasCache) {
+    fs.renameSync(oldDir, newDir);
+  }
+  try {
+    for (const record of copies) {
+      if (record.destination === oldName) {
+        record.destination = newName;
+      }
+    }
+    copiesConfig.set('copies', copies);
+
+    const destinations = getDestinations();
+    for (const dest of destinations) {
+      if (dest.name === oldName) {
+        dest.name = newName;
+      }
+    }
+    config.set('destinations', destinations);
+  } catch (err) {
+    if (hasCache) {
+      fs.renameSync(newDir, oldDir);
+    }
+    try {
+      copiesConfig.set('copies', original);
+    } catch {
+      // ponytail: best effort; the original error is what matters
+    }
+    throw err;
+  }
 }
 
 export function getCopies(): CopyRecord[] {

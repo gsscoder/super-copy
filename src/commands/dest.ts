@@ -1,6 +1,8 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
-import { getDestinations, addDestination, removeDestination, destinationExists } from '../config.js';
+import { getDestinations, addDestination, removeDestination, renameDestination, destinationExists, getCopiesByDestination, fileCacheDir, dataPath } from '../config.js';
+import { resolveInside } from '../safe-path.js';
 import { validateLocalPath } from '../validate.js';
 import { success, error, dim, printDestinationList } from '../ui.js';
 
@@ -29,6 +31,33 @@ function handleRemove(name: string): void {
   success(`Destination "${name}" removed`);
 }
 
+function handleRename(oldName: string, newName: string): void {
+  if (!destinationExists(oldName)) {
+    error(`destination "${oldName}" not found`);
+    return;
+  }
+  if (oldName === newName) {
+    error(`new name must differ from the current name "${oldName}"`);
+    return;
+  }
+  if (destinationExists(newName)) {
+    error(`destination "${newName}" already exists`);
+    return;
+  }
+  try {
+    resolveInside(path.join(dataPath, 'cache'), newName);
+  } catch {
+    error(`unsafe destination name: "${newName}"`);
+    return;
+  }
+  if (getCopiesByDestination(newName).length > 0 || fs.existsSync(fileCacheDir(newName))) {
+    error(`leftover copy records or cache exist for "${newName}"; run 'scopy purge log ${newName}' first`);
+    return;
+  }
+  renameDestination(oldName, newName);
+  success(`Destination "${oldName}" renamed to "${newName}"`);
+}
+
 function handleList(): void {
   const destinations = getDestinations();
   if (destinations.length === 0) {
@@ -55,6 +84,13 @@ export default function register(program: Command): void {
     .description('Remove a destination by name')
     .argument('<name>', 'Destination name')
     .action(handleRemove);
+
+  dest
+    .command('rename')
+    .description('Rename a destination')
+    .argument('<old>', 'Current destination name')
+    .argument('<new>', 'New destination name')
+    .action(handleRename);
 
   dest
     .command('list')
