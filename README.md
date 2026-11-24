@@ -84,7 +84,7 @@ scopy purge log <dest|*> --dry-run   # show what would be removed
 
 # Config & info
 scopy config [key] [value]           # get or set preferences (e.g. sync.allowOverwrite)
-scopy info                           # show version, config path, clone path, register path
+scopy info                           # show version, config path, register path
 ```
 
 ## Requirements

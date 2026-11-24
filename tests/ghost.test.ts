@@ -131,6 +131,24 @@ describe('ghost', () => {
     expect(getCopies()[0].ghosted).toBe(true);
   });
 
+  it('ghost with a filename that starts with digits selects by filename, not index', async () => {
+    populateSource(dirs.source, { '2024-notes.md': 'notes' });
+    const { handleSync } = await import('../src/commands/sync.js');
+    await handleSync('test-src', 'test-dst', {});
+
+    const { getCopies, getCopyByIndex } = await import('../src/config.js');
+    const destFile = path.join(dirs.dest, '2024-notes.md');
+    expect(fs.existsSync(destFile)).toBe(true);
+    // Guard: no record has index 2024, so index-style parsing would fail with "no file with index"
+    expect(getCopyByIndex('test-dst', 2024)).toBeUndefined();
+
+    const { handleGhost } = await import('../src/commands/ghost.js');
+    await handleGhost('test-dst', '2024-notes.md');
+
+    expect(fs.existsSync(destFile)).toBe(false);
+    expect(getCopies()[0].ghosted).toBe(true);
+  });
+
   it('ghost by wildcard * ghosts all files independently', async () => {
     populateSource(dirs.source, { 'a.txt': 'alpha', 'b.txt': 'bravo' });
     const { handleSync } = await import('../src/commands/sync.js');

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -72,6 +73,40 @@ describe('purge', () => {
     // Assert entry still present
     const { getCopies } = await import('../src/config.js');
     expect(getCopies()).toHaveLength(1);
+  });
+
+  it('purge log <dest> deletes that destination cache files and keeps other destinations cache files', async () => {
+    const { addCopy, addDestination, getCopies, fileCachePath } = await import('../src/config.js');
+    addDestination({ name: 'test-dst2', location: path.join(dirs.data, 'dest2') });
+    addCopy({ source: 'test-src', destination: 'test-dst', file: 'a.txt', copiedAt: new Date().toISOString() });
+    addCopy({ source: 'test-src', destination: 'test-dst2', file: 'b.txt', copiedAt: new Date().toISOString() });
+    const [purged, kept] = getCopies();
+    const purgedCache = fileCachePath('test-dst', purged.index!);
+    const keptCache = fileCachePath('test-dst2', kept.index!);
+    for (const p of [purgedCache, keptCache]) {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, 'cached');
+    }
+
+    const { handlePurgeLog } = await import('../src/commands/purge.js');
+    await handlePurgeLog('test-dst', { dryRun: false, force: true });
+
+    expect(fs.existsSync(purgedCache)).toBe(false);
+    expect(fs.existsSync(keptCache)).toBe(true);
+  });
+
+  it('purge log --dry-run leaves registry entries and cache files untouched', async () => {
+    const { addCopy, getCopies, fileCachePath } = await import('../src/config.js');
+    addCopy({ source: 'test-src', destination: 'test-dst', file: 'a.txt', copiedAt: new Date().toISOString() });
+    const cachePath = fileCachePath('test-dst', getCopies()[0].index!);
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, 'cached');
+
+    const { handlePurgeLog } = await import('../src/commands/purge.js');
+    await handlePurgeLog('*', { dryRun: true, force: true });
+
+    expect(getCopies()).toHaveLength(1);
+    expect(fs.readFileSync(cachePath, 'utf8')).toBe('cached');
   });
 
   it('purge log with no dest prints no-op, mutates nothing', async () => {

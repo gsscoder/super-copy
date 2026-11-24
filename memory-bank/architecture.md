@@ -94,14 +94,14 @@ resolve files -> flatten to basename -> resolveInside(dest)
 
 ### ghost
 `ghost [dest] [selector]`; selector = index | filename | wildcard
-- Selector read as index if `parseInt` is not `NaN` (so `2024-notes.md` = index 2024), else glob on `file`
+- Selector read as index only if it matches `/^\d+$/` (all digits), else filename/glob on `file`
 - Toggle: ghost = delete dest file + `ghosted=true` (missing cache blob only warns); restore = copy cache -> dest + `ghosted=false` (missing cache blob = error)
 - No dest or no selector -> interactive select
 
 ### log, purge, list, info, config
 - `log [dest]`: registry grouped by destination; shows `index`, `file`, `copiedAt`, `[ghosted]`/`[unghosted]`; lists unsynced destinations
-- `purge log <dest|*> [--dry-run] [--force]`: `purgeCopies` by predicate; y/N confirm unless `--force` or `--dry-run`; omitted dest = error; registry only (cache blobs and dest files kept)
-- `list`: sources + destinations; `info`: banner, version, config path, `<dataPath>/repos` (labelled `clone path`; no clone is made), register path; `config [key] [value]`: get/set prefs, dismiss tips
+- `purge log <dest|*> [--dry-run] [--force]`: `purgeCopies` by predicate; y/N confirm unless `--force` or `--dry-run`; omitted dest = error; non-dry-run also deletes the cache blob of each removed record with an index; dest files kept
+- `list`: sources + destinations; `info`: banner, name + version, config path, register path; `config [key] [value]`: get/set prefs, dismiss tips
 
 ## Cross-Cutting Concerns
 - Path safety: `resolveInside` on every source read and dest write in `sync`/`resync`/`ghost`; rejects `..`, absolute, Windows `..\`; `{realpath: true}` on source reads also rejects symlinks/junctions resolving outside base
@@ -124,10 +124,6 @@ resolve files -> flatten to basename -> resolveInside(dest)
 - Isolation via `SCOPY_CONFIG_DIR` / `SCOPY_DATA_DIR`
 
 ## Known Gaps / Drift
-- `AGENTS.md` lists `simple-git` and installable post-deploy transformation modules; neither exists in code (file is write-protected by its own rules)
-- `purge log` command description mentions `--older-than`; option not implemented
-- `info` prints a `clone path` (`<dataPath>/repos`); no clone is ever made
-- `purge log` leaves cache blobs under `<dataPath>/cache/<dest>/` (orphaned after purge)
 - Structural: `sync.ts` and `resync.ts` each duplicate git/local branches (copy loop, cache write)
 - Specs and `README.md` were aligned to the code; the code is the source of truth
 

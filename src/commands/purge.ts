@@ -1,6 +1,7 @@
 import { Command } from 'commander';
+import fs from 'node:fs';
 import readline from 'node:readline';
-import { getCopies, purgeCopies } from '../config.js';
+import { fileCachePath, getCopies, purgeCopies } from '../config.js';
 import type { CopyRecord } from '../types.js';
 import { error as uiError, dim } from '../ui.js';
 
@@ -27,6 +28,12 @@ function applyPurge(predicate: (r: CopyRecord) => boolean, dryRun: boolean): voi
       dim(`· ${r.file} (${r.source} → ${r.destination})`);
     }
     return;
+  }
+
+  for (const r of getCopies().filter(predicate)) {
+    if (r.index !== undefined) {
+      fs.rmSync(fileCachePath(r.destination, r.index), { force: true });
+    }
   }
 
   const removed = purgeCopies(predicate);
@@ -62,7 +69,7 @@ export default function registerPurge(program: Command): void {
 
   purge
     .command('log [dest]')
-    .description('Remove copy log entries by destination (* = all, <name> = named dest) or by age (--older-than)')
+    .description('Remove copy log entries by destination (* = all, <name> = named dest)')
     .option('--dry-run', 'Show what would be removed without modifying the registry')
     .option('--force', 'Skip confirmation prompt')
     .action((dest: string | undefined, opts: PurgeLogOptions) => handlePurgeLog(dest, opts));

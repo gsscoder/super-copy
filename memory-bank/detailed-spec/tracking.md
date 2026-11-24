@@ -66,7 +66,7 @@ Toggles a tracked file between present and ghosted state by index
 ### Command Signature
 `scopy ghost [dest] [selector]`
 - `dest` (str, optional): registered destination name
-- `selector` (optional): file index (int), exact filename, or wildcard pattern (e.g. `task-*`). It is read as an index whenever `parseInt` of it is not `NaN` (so `2024-notes.md` is read as index 2024); otherwise it is matched as a glob against `file`
+- `selector` (optional): file index (int), exact filename, or wildcard pattern (e.g. `task-*`). It is read as an index only when it matches `/^\d+$/` (all digits); anything else is matched as a filename/glob against `file`
 - Without `selector`: interactive checkbox over the tracked files of `dest` (or of all destinations if `dest` is also omitted); checked = ghosted; each changed row is toggled on confirm
 
 ### Ghost (active → ghosted)
@@ -83,7 +83,7 @@ Copies from `fileCachePath(dest, index)` back to the destination directory. Sets
 - Skips a record without index (error), or with an unsafe path (error, exit code 1)
 
 ## Purge
-Deletes entries from the copy log (registry). Cache blobs under `<data>/cache/<dest>/` and destination files are not deleted
+Deletes entries from the copy log (registry). A non-dry-run purge also deletes the cache blob (`fileCachePath(dest, index)`) of each removed record that has an index; destination files are not deleted. Purging a ghosted record also deletes its only cached copy
 
 ### `purge log`
 `scopy purge log [dest] [--dry-run] [--force]`

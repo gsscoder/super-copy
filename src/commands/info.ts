@@ -8,14 +8,12 @@ import { keyValue } from '../ui.js';
 
 function handleInfo(pkg: PackageJson): void {
   const configPath = path.join(configDir, 'scopy.json');
-  const repoPath = path.join(dataPath, 'repos');
   const registerPath = path.join(dataPath, 'scopy-register.json');
 
   console.log(chalk.cyan(figlet.textSync('scopy', { font: 'Small Slant' }).replace(/^\n+/, '\n')));
   console.log();
   console.log(`${chalk.bold.white(pkg.name)} ${chalk.dim(`v${pkg.version}`)}`)
   keyValue('config', configPath);
-  keyValue('clone path', repoPath);
   keyValue('register', registerPath);
 }
 

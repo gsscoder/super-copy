@@ -1,16 +1,15 @@
 # AI guidance
 
 ## Project Brief
-A file distribution utility for deploying assets from registered sources to registered destinations
-Supports post-deploy transformation modules for asset-specific customization — such as Claude Code
-agents, dotfiles, or config files.
+A file distribution utility for deploying assets — such as Claude Code agents, dotfiles, or config files —
+from registered sources (GitHub repos via the GitHub API, or local directories) to registered destinations
+(local directories). Tracks every copy to support resync and ghosting (removing and restoring tracked files).
 Requirements:
 - Scriptable and composable
-- Extensible via installable modules
 - Designed for single-user, local workflows
 
 ## Core Technologies
-Node.js, Commander, Conf, simple-git, Chalk
+Node.js, TypeScript, Commander, Conf, Inquirer, Chalk
 
 ## Memory
 The development documents are in the `memory-bank` dir — they primarily focus on specific feature implementation details

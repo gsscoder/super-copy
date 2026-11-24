@@ -143,8 +143,8 @@ export async function handleGhost(dest: string | undefined, selector: string | u
     return;
   }
 
-  const index = parseInt(selector, 10);
-  if (!isNaN(index)) {
+  if (/^\d+$/.test(selector)) {
+    const index = parseInt(selector, 10);
     const record = getCopyByIndex(dest, index);
     if (record === undefined) {
       uiError(`no file with index ${index} for destination "${dest}"`);
