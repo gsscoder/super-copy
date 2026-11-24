@@ -13,22 +13,30 @@ Requirements:
 Node.js, Commander, Conf, simple-git, Chalk
 
 ## Memory
-The development documents are organized in the `memory-bank` dir:
-- `detailed-spec`: primarily focuses on specific feature implementation details
-- `gen-directives`: content and code generation guidelines
+The development documents are in the `memory-bank` dir — they primarily focus on specific feature implementation details
 
 ## Output
 - Code: match the architectural and stylistic conventions of the existing codebase
+- Language: use English for all generated artifacts and symbols by default. Content in another language is allowed only in user-facing strings, messages, and labels when the application has a single localization
 - Quality: production-grade — every line will be reviewed
 - Markdown: compact, no linting compliance, formatting identical to this file
 
-## Operational Rules:
-- Read a language-specific file in `gen-directives` only when a coding task is requested
-- Read files in `detailed-spec` only when required by the current task; scan filenames first and read file contents only if they are relevant to the task
+# TypeScript Code Standards
+- Generate code for Node.js ESM (ES2022) with TypeScript 6, favoring modern and expressive syntax over legacy patterns
+- Avoid `any`; use `unknown` for uncertain types and narrow before use
+- Do not use non-null assertion (`!`); handle `null`/`undefined` explicitly
+- Avoid `object`/`{}`/`Record<string, any>`; use specific interfaces or type aliases
+- Avoid wide unions; use discriminated unions with `type`/`kind` for explicit handling
+- Avoid `as` casting; use type guards (`is`) for safe narrowing
+
+## Operational Rules
+- For complex requests, start by reading file `memory-bank/architecture.md` before analyzing any code
+- Read files in `memory-bank` only when required by the current task; scan filenames first and read file contents only if they are relevant to the task
+- Review/audit/report requests end at the report; fixing findings needs its own separate request — authorization never carries across turns
 - NEVER update this file
 - NEVER modify `*.md` files in `memory-bank` (at any depth in the dir tree) without an explicit request
-- NEVER initiate any codebase modifications without an explicit request
-- NEVER commit changes to Git history without explicit authorization
+- NEVER commit changes to Git history without explicit authorization; do not suggest committing changes
+- NEVER mention commit state (whether changes are committed, uncommitted, or pushed) unless I ask
 
 ### Before Implementing — Reason First
 - Surface Uncertainty, Don't Guess Through It: When requirements are ambiguous, contradictory, or incomplete, stop and ask instead of assuming intent and proceeding silently. State assumptions explicitly; if multiple readings are viable, present them rather than picking one silently. Resolve intent up front — this is what makes autonomous execution safe afterward

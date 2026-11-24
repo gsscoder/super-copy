@@ -67,18 +67,24 @@ scopy dest list                      # list registered destinations
 # Sync
 scopy sync <source>[/<glob>] <dest>  # copy files; existing files → interactive overwrite selector
 scopy sync ... --force               # overwrite all without prompting
+scopy sync ... --dry-run             # preview files without copying
+scopy sync ... --branch <name>       # fetch a git source from a branch instead of the default
 scopy resync <dest>                  # re-copy all tracked files from their original sources
 scopy resync <dest> --clean          # also delete destination files no longer present in source
+scopy resync <dest> --dry-run        # preview without changes
+scopy resync <dest> --unghost        # restore ghosted files from cache
+scopy resync <dest> --branch <name>  # fetch git sources from a branch instead of the default
 
 # History & state
 scopy log [dest]                     # show copy history grouped by destination
 scopy ghost [dest] [selector]        # toggle file(s) ghosted/present; no args → interactive grouped view
 scopy purge log <dest|*>             # remove log entries (asks confirmation)
 scopy purge log <dest|*> --force     # remove log entries without prompting
+scopy purge log <dest|*> --dry-run   # show what would be removed
 
 # Config & info
 scopy config [key] [value]           # get or set preferences (e.g. sync.allowOverwrite)
-scopy info                           # show config path and registered locations
+scopy info                           # show version, config path, clone path, register path
 ```
 
 ## Requirements

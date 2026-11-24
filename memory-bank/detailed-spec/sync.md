@@ -20,25 +20,25 @@ Command for copying files from a registered source to a registered destination. 
 
 ## Git Source Handling
 Git sources (GitHub HTTPS URLs) are fetched directly from the GitHub API — no local clone is made.
-- Shallow specs (no `**`): file listing from `https://api.github.com/repos/{owner}/{repo}/contents/{path}`; each file downloaded from `https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}`
+- Shallow specs (no `**`): file listing from `https://api.github.com/repos/{owner}/{repo}/contents/{path}` (only entries of type `file`); each file downloaded from the `download_url` the API returns for it
 - Globstar specs (`**` in fileSpec): full tree from `https://api.github.com/repos/{owner}/{repo}/git/trees/HEAD?recursive=1`; blobs filtered by globstar match, then downloaded from raw URL per matched path
 - If source has a `path` field, it scopes the work tree; API paths are relative to that root
 - Errors if the tree response is `truncated` (repo too large — user must narrow the query)
-- With `--branch <name>`: the branch is resolved once to a commit SHA (`https://api.github.com/repos/{owner}/{repo}/commits/{branch}`) before any file listing; that SHA — never the raw branch name — replaces `HEAD` in all three URLs above (`git/trees/{sha}`, `contents/{path}?ref={sha}`, `raw.githubusercontent.com/.../{sha}/{path}`), avoiding ambiguity with slashes in branch names like `feature/x`. Without `--branch`, all three URLs use `HEAD` (or omit `ref`) exactly as before
+- With `--branch <name>`: the branch is resolved once to a commit SHA (`https://api.github.com/repos/{owner}/{repo}/commits/{branch}`) before any file listing; that SHA — never the raw branch name — is used as the ref: `git/trees/{sha}`, `contents/{path}?ref={sha}`, and `raw.githubusercontent.com/.../{sha}/{path}` (globstar downloads), avoiding ambiguity with slashes in branch names like `feature/x`. Without `--branch`, the tree and raw URLs use `HEAD` and the Contents request omits `ref`
 
 ## Copy Behaviour
 Files matched by glob or globstar are copied flat into the destination directory (basename only — no subdirectory structure preserved)
 If a destination file exists and `--force` is not set: interactive checkbox to select which conflicting files to overwrite; unselected files are skipped
 Flattening collision guard: if two or more matched source files share the same basename, sync aborts before copying any file — user must narrow the query or rename files in the source
-Each copied file is logged to the copies registry at `<envPaths('scopy').data>/scopy-register.json` (upsert by destination + file, updates `copiedAt` timestamp and `sourcePath`)
-Summary printed on completion: `N copied, N skipped`
+Each copied file is logged to the copies registry at `<envPaths('scopy').data>/scopy-register.json` (upsert by destination + file, updates `copiedAt` timestamp and `sourcePath`; the data dir can be overridden with `SCOPY_DATA_DIR`) and its bytes are stored in the file cache `<data>/cache/<dest>/<index>` (used by resync and ghost)
+Summary printed on completion: `N copied, N skipped`. If any file failed, an aggregated error is thrown after the summary (non-zero exit)
 
 ## Copies Registry
 Schema of `<envPaths('scopy').data>/scopy-register.json`:
 ```json
 {
   "copies": [
-    { "source": "{sourceName}", "destination": "{destName}", "file": "{dest_basename}", "sourcePath": "{source_rel_path}", "copiedAt": "{iso8601}" }
+    { "source": "{sourceName}", "destination": "{destName}", "file": "{dest_basename}", "sourcePath": "{source_rel_path}", "copiedAt": "{iso8601}", "index": 1, "ghosted": false }
   ]
 }
 ```
@@ -47,6 +47,8 @@ Schema of `<envPaths('scopy').data>/scopy-register.json`:
 - `file` (str): destination filename (basename for glob/globstar syncs)
 - `sourcePath` (str): full relative path within the source work tree — used by resync to re-fetch nested files
 - `copiedAt` (str): ISO 8601 timestamp of last copy
+- `index` (int): global counter (max + 1 at creation), never reassigned; names the cache file and is the ghost selector
+- `ghosted` (bool): file is removed from the destination and held in cache only
 
 ## Resync
 See `tracking.md` — re-copies tracked files for a destination using the copies registry built by `sync`.
@@ -58,4 +60,5 @@ See `tracking.md` — re-copies tracked files for a destination using the copies
 - Errors if `--branch` names a branch that doesn't exist in the repo
 - Errors on flattening basename collision within a single sync query (lists all conflicts)
 - Errors if fileSpec escapes the source work tree (path traversal)
-- Silently skips if no files match the spec
+- Prints `No files to copy` and returns (no error) if no files match the spec
+- Validation errors (unknown source/destination, `--branch` on a local source, branch resolution or listing failure) are printed and the command returns; only per-file copy failures set a non-zero exit
